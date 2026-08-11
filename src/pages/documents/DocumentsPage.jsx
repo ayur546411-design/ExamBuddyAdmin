@@ -17,7 +17,7 @@ export default function DocumentsPage(){
     async function load(){
       setLoading(true)
       try{
-        const res = await getDocuments({ document_type: typeFilter || undefined })
+        const res = await getDocuments({ document_type: typeFilter || undefined, page: 1, page_size: 25 })
         setDocs(res.data || [])
       }catch(e){
         console.error(e)

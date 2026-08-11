@@ -1,24 +1,46 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
-import { setAuthToken } from '../api/client'
+import React, { createContext, useCallback, useContext, useLayoutEffect, useEffect, useState } from 'react'
+import api, { setAuthToken } from '../api/client'
 
 const AuthContext = createContext()
 
 export function AuthProvider({ children }){
-  const [token, setToken] = useState(localStorage.getItem('exambuddy_token'))
+  const [token, setToken] = useState(() => {
+    try {
+      return localStorage.getItem('exambuddy_token')
+    } catch {
+      return null
+    }
+  })
 
-  useEffect(() => {
+  const logout = useCallback(() => {
+    setToken(null)
+    localStorage.removeItem('exambuddy_token')
+    setAuthToken(null)
+  }, [])
+
+  useLayoutEffect(() => {
     setAuthToken(token)
   }, [token])
+
+  useEffect(() => {
+    const interceptor = api.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        const status = error?.response?.status
+        if (status === 401 || status === 403) {
+          logout()
+          window.location.replace('/login')
+        }
+        return Promise.reject(error)
+      }
+    )
+
+    return () => api.interceptors.response.eject(interceptor)
+  }, [logout])
 
   const login = (t) => {
     setToken(t)
     localStorage.setItem('exambuddy_token', t)
-  }
-
-  const logout = () => {
-    setToken(null)
-    localStorage.removeItem('exambuddy_token')
-    setAuthToken(null)
   }
 
   return (

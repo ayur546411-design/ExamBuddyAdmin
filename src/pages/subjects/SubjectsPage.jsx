@@ -69,10 +69,11 @@ export default function SubjectsPage(){
 
       setDepartments(departmentData)
       if (departmentData.length) {
-        const firstDepartment = departmentData[0]
-        setSelectedDepartmentId((current) => current || firstDepartment.id)
-        setSelectedSemesterId((current) => current || firstDepartment.semesters?.[0]?.id || '')
-        setSemesterForm((prev) => ({ ...prev, department_id: firstDepartment.id }))
+        const departmentWithData = departmentData.find((dept) => dept.semesters.length > 0) || departmentData[0]
+        const firstSemester = departmentWithData.semesters?.[0]
+        setSelectedDepartmentId((current) => current || departmentWithData.id)
+        setSelectedSemesterId((current) => current || firstSemester?.id || '')
+        setSemesterForm((prev) => ({ ...prev, department_id: departmentWithData.id }))
       } else {
         setSelectedDepartmentId('')
         setSelectedSemesterId('')
@@ -117,6 +118,8 @@ export default function SubjectsPage(){
     return selectedDepartment.semesters.find((semester) => semester.id === selectedSemesterId) || selectedDepartment.semesters[0] || null
   }, [selectedDepartment, selectedSemesterId])
 
+  const hasSemesters = Boolean(selectedDepartment && selectedDepartment.semesters.length > 0)
+
   const subjectCount = useMemo(() => {
     return departments.reduce((total, department) => total + department.semesters.reduce((sum, semester) => sum + semester.subjects.length, 0), 0)
   }, [departments])
@@ -129,6 +132,10 @@ export default function SubjectsPage(){
   }
 
   function openAddModal(){
+    if (!selectedSemester) {
+      setError('Add a semester first before creating subjects in this department.')
+      return
+    }
     setModalState({ type: 'add' })
     setFormState({ name: '', code: '', description: '', content: '' })
     setShiftTargetId('')
@@ -180,7 +187,10 @@ export default function SubjectsPage(){
 
   async function handleSaveSubject(event){
     event.preventDefault()
-    if (!formState.name.trim() || !formState.code.trim() || !selectedDepartment || !selectedSemester) return
+    if (!formState.name.trim() || !formState.code.trim() || !selectedDepartment || !selectedSemester) {
+      setError('Select a department and semester before adding a subject.')
+      return
+    }
 
     setSaving(true)
     setError('')
@@ -214,14 +224,17 @@ export default function SubjectsPage(){
     setSaving(true)
     setError('')
     try {
-      await api.post('/semesters/', {
+      const res = await api.post('/semesters/', {
         department_id: semesterForm.department_id,
         semester_number: Number(semesterForm.semester_number),
         academic_year: semesterForm.academic_year.trim(),
         description: semesterForm.description.trim(),
         is_active: true
       })
+      const createdSemester = res.data
       await loadData()
+      setSelectedDepartmentId(createdSemester.department_id)
+      setSelectedSemesterId(createdSemester.id)
       setSemesterModalOpen(false)
       setSemesterForm({ department_id: selectedDepartment?.id || '', semester_number: '', academic_year: '', description: '' })
     } catch (err) {
@@ -305,7 +318,7 @@ export default function SubjectsPage(){
             <h3>Departments</h3>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn" type="button" onClick={() => { setSemesterForm((prev) => ({ ...prev, department_id: selectedDepartment?.id || '' })); setSemesterModalOpen(true) }}>Add semester</button>
-              <button className="btn primary" onClick={openAddModal}>Add subject</button>
+              <button className="btn primary" onClick={openAddModal} disabled={!selectedDepartment || !hasSemesters}>{selectedSemester ? 'Add subject' : 'Add subject after semester'}</button>
             </div>
           </div>
           <div className="tree-list">
@@ -338,7 +351,7 @@ export default function SubjectsPage(){
           <div className="section-header">
             <div>
               <h3>{selectedDepartment?.name || 'Choose department'}</h3>
-              <p>{selectedSemester?.name || 'Choose a semester to view subjects'}</p>
+              <p>{selectedSemester ? selectedSemester.name : (selectedDepartment ? 'Add a semester to view subjects' : 'Choose a department to view semesters')}</p>
             </div>
             <div className="inline-controls">
               <label>
@@ -361,7 +374,11 @@ export default function SubjectsPage(){
           </div>
 
           {!selectedSemester ? (
-            <div className="empty-state">Select a department and semester to start managing subjects.</div>
+            <div className="empty-state">
+              {selectedDepartment
+                ? 'This department has no semesters yet. Create one to start adding subjects.'
+                : 'Select a department and semester to start managing subjects.'}
+            </div>
           ) : (
             <div className="subject-list">
               {selectedSemester.subjects.map((subject) => (

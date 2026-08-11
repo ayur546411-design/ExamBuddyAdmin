@@ -90,10 +90,46 @@ button, input, select, textarea{ font:inherit }
 .main-content{ flex:1; display:flex; flex-direction:column; }
 .topbar{ display:flex; justify-content:space-between; align-items:center; padding:16px 24px; background:#fff; border-bottom:1px solid #e2e8f0; }
 .content-area{ flex:1; padding:24px }
+.pill-box{ display:flex; flex-wrap:wrap; gap:8px }
+.pill{ display:inline-flex; align-items:center; padding:8px 12px; border-radius:999px; background:#e2e8f0; color:#334155; font-size:0.9rem }
+.pill.accent{ background:#dbeafe; color:#1d4ed8 }
+.subject-shell{ display:grid; grid-template-columns: 300px 1fr; gap:18px }
+.subject-tree, .subject-main{ min-height:500px }
+.tree-header{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:14px }
+.tree-list{ display:grid; gap:10px }
+.tree-group{ display:grid; gap:8px }
+.tree-toggle, .tree-node{ width:100%; text-align:left; border:none; background:#f8fafc; color:#0f172a; border-radius:12px; padding:10px 12px; cursor:pointer; display:flex; justify-content:space-between; gap:8px; align-items:center }
+.tree-toggle.active, .tree-node.active{ background:#dbeafe; color:#1d4ed8 }
+.tree-toggle small, .tree-node small{ color:#64748b }
+.tree-nested{ display:grid; gap:8px; margin-left:10px }
+.inline-controls{ display:flex; flex-wrap:wrap; gap:12px }
+.inline-controls label{ display:grid; gap:6px; color:#475569; font-size:0.9rem }
+.inline-controls select{ padding:8px 10px; border-radius:10px; border:1px solid #dbeafe }
+.subject-list{ display:grid; gap:14px }
+.subject-card{ background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; padding:16px; display:grid; gap:12px }
+.subject-card-header{ display:flex; justify-content:space-between; gap:12px; align-items:center }
+.subject-card-header h4{ margin:0 }
+.subject-card-header p{ margin:4px 0 0; color:#64748b }
+.subject-code{ background:#dbeafe; color:#1d4ed8; padding:8px 12px; border-radius:999px; font-weight:700 }
+.subject-meta{ display:flex; flex-wrap:wrap; gap:8px }
+.meta-pill{ display:inline-flex; align-items:center; padding:6px 10px; border-radius:999px; background:#e2e8f0; color:#334155; font-size:0.82rem }
+.meta-pill.success{ background:#dcfce7; color:#166534 }
+.subject-content{ background:white; border-radius:12px; padding:12px; border:1px solid #e2e8f0 }
+.subject-actions{ display:flex; flex-wrap:wrap; gap:10px }
+.text-button.danger{ color:#dc2626 }
+.modal-backdrop{ position:fixed; inset:0; background:rgba(15,23,42,0.55); display:flex; align-items:center; justify-content:center; padding:20px; z-index:50 }
+.modal-card{ width:min(640px, 100%); background:white; border-radius:18px; padding:20px; box-shadow:0 20px 50px rgba(15,23,42,0.2) }
+.modal-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px }
+.modal-form{ display:grid; gap:14px }
+.modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:4px }
+.modal-hint{ margin:0; color:#64748b }
+.empty-state{ padding:24px; border:1px dashed #cbd5e1; border-radius:14px; color:#64748b; background:#f8fafc }
 @media(max-width: 960px){
   .page-heading, .filter-bar, .detail-grid{ grid-template-columns: 1fr }
   .app-shell{ flex-direction:column }
   .sidebar{ width:100%; flex-direction:row; flex-wrap:wrap; gap:8px; align-items:center }
   .sidebar-nav{ flex-direction:row; flex-wrap:wrap }
   .content-area{ padding:16px }
+  .subject-shell{ grid-template-columns: 1fr }
+  .subject-tree{ order:2 }
 }

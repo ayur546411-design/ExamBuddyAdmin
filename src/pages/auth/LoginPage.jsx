@@ -16,14 +16,16 @@ export default function LoginPage(){
     async function load(){
       try{
         const res = await api.get('/schools/')
-        setSchools(res.data || [])
-        if(res.data && res.data.length>0){
-          const first = res.data[0]
+        const schoolList = res.data || []
+        setSchools(schoolList)
+        if(schoolList.length > 0){
+          const first = schoolList[0]
           setForm(f=> ({...f, school_id: first.id}))
           const dres = await api.get(`/schools/${first.id}/departments/`)
-          setDepartments(dres.data || [])
-          if(dres.data && dres.data.length>0){
-            setForm(f=> ({...f, department_id: dres.data[0].id}))
+          const departmentList = dres.data || []
+          setDepartments(departmentList)
+          if(departmentList.length > 0){
+            setForm(f=> ({...f, department_id: departmentList[0].id}))
           }
         }
       }catch(e){
@@ -38,15 +40,20 @@ export default function LoginPage(){
     setLoading(true)
     setError(null)
     try{
-      if(!form.school_id || !form.department_id){
+      const selectedSchoolId = form.school_id
+      const selectedDepartmentId = form.department_id
+      const validDepartment = departments.find((department) => department.id === selectedDepartmentId)
+
+      if(!selectedSchoolId || !validDepartment){
         setError('Select a school and department before signing in.')
         setLoading(false)
         return
       }
+
       const payload = {
         full_name: form.full_name,
-        school_id: form.school_id,
-        department_id: form.department_id,
+        school_id: selectedSchoolId,
+        department_id: validDepartment.id,
         role: 'admin'
       }
       const res = await api.post('/auth/onboard', payload)
@@ -64,9 +71,10 @@ export default function LoginPage(){
     setForm(f=> ({...f, school_id: schoolId, department_id: ''}))
     try{
       const dres = await api.get(`/schools/${schoolId}/departments/`)
-      setDepartments(dres.data || [])
-      if(dres.data && dres.data.length>0){
-        setForm(f=> ({...f, department_id: dres.data[0].id}))
+      const departmentList = dres.data || []
+      setDepartments(departmentList)
+      if(departmentList.length > 0){
+        setForm(f=> ({...f, department_id: departmentList[0].id}))
       }
     }catch(e){
       console.error('Failed to load departments', e)

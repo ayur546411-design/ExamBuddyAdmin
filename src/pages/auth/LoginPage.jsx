@@ -15,12 +15,12 @@ export default function LoginPage(){
   useEffect(()=>{
     async function load(){
       try{
-        const res = await api.get('/schools')
+        const res = await api.get('/schools/')
         setSchools(res.data || [])
         if(res.data && res.data.length>0){
           const first = res.data[0]
           setForm(f=> ({...f, school_id: first.id}))
-          const dres = await api.get(`/schools/${first.id}/departments`)
+          const dres = await api.get(`/schools/${first.id}/departments/`)
           setDepartments(dres.data || [])
           if(dres.data && dres.data.length>0){
             setForm(f=> ({...f, department_id: dres.data[0].id}))
@@ -63,7 +63,7 @@ export default function LoginPage(){
   async function handleSchoolChange(schoolId){
     setForm(f=> ({...f, school_id: schoolId, department_id: ''}))
     try{
-      const dres = await api.get(`/schools/${schoolId}/departments`)
+      const dres = await api.get(`/schools/${schoolId}/departments/`)
       setDepartments(dres.data || [])
       if(dres.data && dres.data.length>0){
         setForm(f=> ({...f, department_id: dres.data[0].id}))

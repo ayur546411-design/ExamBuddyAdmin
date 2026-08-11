@@ -19,12 +19,12 @@ export default function SubjectsPage(){
     setLoading(true)
     setError('')
     try {
-      const schoolsRes = await api.get('/schools')
+      const schoolsRes = await api.get('/schools/')
       const schools = schoolsRes.data || []
 
       const deptRows = []
       for (const school of schools) {
-        const departmentsRes = await api.get(`/schools/${school.id}/departments`)
+        const departmentsRes = await api.get(`/schools/${school.id}/departments/`)
         const departmentsForSchool = departmentsRes.data || []
         deptRows.push(...departmentsForSchool.map((dept) => ({ ...dept, schoolName: school.name, school_id: dept.school_id || school.id })))
       }
@@ -32,8 +32,8 @@ export default function SubjectsPage(){
       const departmentData = await Promise.all(
         deptRows.map(async (dept) => {
           const [semestersRes, subjectsRes] = await Promise.all([
-            api.get('/semesters', { params: { department_id: dept.id } }),
-            api.get('/subjects', { params: { department_id: dept.id } })
+            api.get('/semesters/', { params: { department_id: dept.id } }),
+            api.get('/subjects/', { params: { department_id: dept.id } })
           ])
 
           const semesters = (semestersRes.data || []).map((sem) => ({
@@ -185,7 +185,7 @@ export default function SubjectsPage(){
     setSaving(true)
     setError('')
     try {
-      await api.post('/subjects', {
+      await api.post('/subjects/', {
         name: formState.name.trim(),
         code: formState.code.trim(),
         description: formState.description.trim() || formState.content.trim(),
@@ -214,7 +214,7 @@ export default function SubjectsPage(){
     setSaving(true)
     setError('')
     try {
-      await api.post('/semesters', {
+      await api.post('/semesters/', {
         department_id: semesterForm.department_id,
         semester_number: Number(semesterForm.semester_number),
         academic_year: semesterForm.academic_year.trim(),

@@ -26,61 +26,77 @@ export default function SubjectsPage(){
       for (const school of schools) {
         const departmentsRes = await api.get(`/schools/${school.id}/departments/`)
         const departmentsForSchool = departmentsRes.data || []
-        deptRows.push(...departmentsForSchool.map((dept) => ({ ...dept, schoolName: school.name, school_id: dept.school_id || school.id })))
+        deptRows.push(...departmentsForSchool.map((dept) => ({ ...dept, schoolName: school.name, school_id: dept.school_id || school.id, semesters: [] })))
       }
 
-      const departmentData = await Promise.all(
-        deptRows.map(async (dept) => {
-          const [semestersRes, subjectsRes] = await Promise.all([
-            api.get('/semesters/', { params: { department_id: dept.id } }),
-            api.get('/subjects/', { params: { department_id: dept.id } })
-          ])
-
-          const semesters = (semestersRes.data || []).map((sem) => ({
-            id: sem.id,
-            name: `Semester ${sem.semester_number}`,
-            semester_number: sem.semester_number,
-            academic_year: sem.academic_year || '',
-            description: sem.description || '',
-            subjects: []
-          }))
-
-          const subjects = (subjectsRes.data || []).map((subject) => ({
-            ...subject,
-            description: subject.description || '',
-            content: subject.description || '',
-            pdfName: '',
-            pdfUrl: ''
-          }))
-
-          const subjectsBySemester = new Map(semesters.map((sem) => [sem.id, []]))
-          subjects.forEach((subject) => {
-            if (subject.semester_id && subjectsBySemester.has(subject.semester_id)) {
-              subjectsBySemester.get(subject.semester_id).push(subject)
-            }
-          })
-
-          return {
-            ...dept,
-            semesters: semesters.map((sem) => ({ ...sem, subjects: subjectsBySemester.get(sem.id) || [] }))
-          }
-        })
-      )
-
-      setDepartments(departmentData)
-      if (departmentData.length) {
-        const departmentWithData = departmentData.find((dept) => dept.semesters.length > 0) || departmentData[0]
-        const firstSemester = departmentWithData.semesters?.[0]
-        setSelectedDepartmentId((current) => current || departmentWithData.id)
-        setSelectedSemesterId((current) => current || firstSemester?.id || '')
-        setSemesterForm((prev) => ({ ...prev, department_id: departmentWithData.id }))
+      setDepartments(deptRows)
+      if (deptRows.length) {
+        const firstDept = deptRows[0]
+        setSelectedDepartmentId((current) => current || firstDept.id)
+        setSelectedSemesterId('')
+        setSemesterForm((prev) => ({ ...prev, department_id: firstDept.id }))
       } else {
         setSelectedDepartmentId('')
         setSelectedSemesterId('')
       }
     } catch (err) {
       console.error('Failed to load department data', err)
-      setError(err?.response?.data?.detail || 'Failed to load departments, semesters, and subjects')
+      setError(err?.response?.data?.detail || 'Failed to load departments and subjects')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function loadDepartmentData(departmentId){
+    setLoading(true)
+    setError('')
+    try {
+      const [semestersRes, subjectsRes] = await Promise.all([
+        api.get('/semesters/', { params: { department_id: departmentId } }),
+        api.get('/subjects/', { params: { department_id: departmentId } })
+      ])
+
+      const semesters = (semestersRes.data || []).map((sem) => ({
+        id: sem.id,
+        name: `Semester ${sem.semester_number}`,
+        semester_number: sem.semester_number,
+        academic_year: sem.academic_year || '',
+        description: sem.description || '',
+        subjects: []
+      }))
+
+      const subjects = (subjectsRes.data || []).map((subject) => ({
+        ...subject,
+        description: subject.description || '',
+        content: subject.description || '',
+        pdfName: '',
+        pdfUrl: ''
+      }))
+
+      const subjectsBySemester = new Map(semesters.map((sem) => [sem.id, []]))
+      subjects.forEach((subject) => {
+        if (subject.semester_id && subjectsBySemester.has(subject.semester_id)) {
+          subjectsBySemester.get(subject.semester_id).push(subject)
+        }
+      })
+
+      setDepartments((prev) => prev.map((dept) => {
+        if (dept.id !== departmentId) return dept
+        return {
+          ...dept,
+          semesters: semesters.map((sem) => ({ ...sem, subjects: subjectsBySemester.get(sem.id) || [] }))
+        }
+      }))
+
+      if (departmentId === selectedDepartmentId) {
+        setSelectedSemesterId((current) => {
+          const found = semesters.find((sem) => sem.id === current)
+          return found ? current : semesters[0]?.id || ''
+        })
+      }
+    } catch (err) {
+      console.error('Failed to load department details', err)
+      setError(err?.response?.data?.detail || 'Failed to load semesters and subjects for this department')
     } finally {
       setLoading(false)
     }
@@ -89,6 +105,12 @@ export default function SubjectsPage(){
   useEffect(() => {
     loadData()
   }, [])
+
+  useEffect(() => {
+    if (selectedDepartmentId) {
+      loadDepartmentData(selectedDepartmentId)
+    }
+  }, [selectedDepartmentId])
 
   useEffect(() => {
     if (!departments.length) {

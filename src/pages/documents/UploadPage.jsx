@@ -4,10 +4,17 @@ import api from '../../api/client'
 
 const documentTypes = [
   { value: 'syllabus', label: 'Syllabus' },
-  { value: 'pyq', label: 'Past Year Question Paper' },
+  { value: 'pyq', label: 'PYQ / Question Paper' },
   { value: 'academic_calendar', label: 'Academic Calendar' },
   { value: 'note', label: 'Notes' },
   { value: 'other', label: 'Other' }
+]
+
+const examTypes = [
+  { value: '', label: 'Select exam type' },
+  { value: 'ct1', label: 'CT1' },
+  { value: 'ct2', label: 'CT2' },
+  { value: 'end_semester', label: 'End Semester' }
 ]
 
 export default function UploadPage(){
@@ -15,7 +22,7 @@ export default function UploadPage(){
   const [departments, setDepartments] = useState([])
   const [semesters, setSemesters] = useState([])
   const [subjects, setSubjects] = useState([])
-  const [form, setForm] = useState({ school_id: '', department_id: '', semester_id: '', subject_id: '', document_type: 'syllabus', title: '', academic_year: '' })
+  const [form, setForm] = useState({ school_id: '', department_id: '', semester_id: '', subject_id: '', document_type: 'syllabus', title: '', academic_year: '', exam_type: '', pdf_url: '', youtube_url: '', video_title: '', description: '' })
   const [file, setFile] = useState(null)
   const [error, setError] = useState(null)
   const [progress, setProgress] = useState(0)
@@ -106,6 +113,11 @@ export default function UploadPage(){
     fd.append('document_type', form.document_type)
     fd.append('academic_year', form.academic_year)
     fd.append('title', form.title)
+    fd.append('description', form.description)
+    fd.append('exam_type', form.exam_type)
+    fd.append('pdf_url', form.pdf_url)
+    fd.append('youtube_url', form.youtube_url)
+    fd.append('video_title', form.video_title)
 
     setUploading(true)
     setError(null)
@@ -181,6 +193,33 @@ export default function UploadPage(){
         <div style={{ gridColumn: 'span 2' }}>
           <label>Title</label>
           <input value={form.title} onChange={e=>setForm(prev=>({ ...prev, title: e.target.value }))} placeholder="Document title" />
+        </div>
+
+        <div style={{ gridColumn: 'span 2' }}>
+          <label>Description</label>
+          <input value={form.description} onChange={e=>setForm(prev=>({ ...prev, description: e.target.value }))} placeholder="Optional description" />
+        </div>
+
+        <div>
+          <label>Exam Type</label>
+          <select value={form.exam_type} onChange={e=>setForm(prev=>({ ...prev, exam_type: e.target.value }))}>
+            {examTypes.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label>Direct PDF URL</label>
+          <input value={form.pdf_url} onChange={e=>setForm(prev=>({ ...prev, pdf_url: e.target.value }))} placeholder="https://...pdf" />
+        </div>
+
+        <div>
+          <label>YouTube URL</label>
+          <input value={form.youtube_url} onChange={e=>setForm(prev=>({ ...prev, youtube_url: e.target.value }))} placeholder="https://www.youtube.com/watch?v=..." />
+        </div>
+
+        <div>
+          <label>Video Title</label>
+          <input value={form.video_title} onChange={e=>setForm(prev=>({ ...prev, video_title: e.target.value }))} placeholder="Optional video label" />
         </div>
 
         <div style={{ gridColumn: 'span 2' }}>

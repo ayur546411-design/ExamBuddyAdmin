@@ -210,33 +210,75 @@ export default function SubjectsPage(){
   async function handleSaveSubject(event){
     event.preventDefault()
     if (!formState.name.trim() || !formState.code.trim() || !selectedDepartment || !selectedSemester) {
-      setError('Select a department and semester before adding a subject.')
+      setError('Select a department and semester before saving a subject.')
       return
     }
 
     setSaving(true)
     setError('')
     try {
-      await api.post('/subjects/', {
-        name: formState.name.trim(),
-        code: formState.code.trim(),
-        description: formState.description.trim() || formState.content.trim(),
-        credits: 0,
-        faculty_name: '',
-        subject_type: 'theory',
-        school_id: selectedDepartment.school_id,
-        department_id: selectedDepartment.id,
-        semester_id: selectedSemester.id,
-        is_active: true
-      })
-      await loadData()
+      if (modalState?.type === 'edit' && modalState.subjectId) {
+        updateSubject(modalState.subjectId, {
+          name: formState.name.trim(),
+          code: formState.code.trim(),
+          description: formState.description.trim() || formState.content.trim(),
+          content: formState.content.trim()
+        })
+      } else {
+        await api.post('/subjects/', {
+          name: formState.name.trim(),
+          code: formState.code.trim(),
+          description: formState.description.trim() || formState.content.trim(),
+          credits: 0,
+          faculty_name: '',
+          subject_type: 'theory',
+          school_id: selectedDepartment.school_id,
+          department_id: selectedDepartment.id,
+          semester_id: selectedSemester.id,
+          is_active: true
+        })
+        await loadData()
+      }
       closeModal()
     } catch (err) {
-      console.error('Failed to create subject', err)
-      setError(err?.response?.data?.detail || 'Could not create subject')
+      console.error('Failed to save subject', err)
+      setError(err?.response?.data?.detail || 'Could not save subject')
     } finally {
       setSaving(false)
     }
+  }
+
+  function handleShiftSubject(event){
+    event.preventDefault()
+    if (!modalState?.subjectId || !shiftTargetId) return
+
+    const subjectToMove = selectedSemester?.subjects.find((subject) => subject.id === modalState.subjectId)
+    if (!subjectToMove) return
+
+    updateSubject(modalState.subjectId, { semester_id: shiftTargetId })
+    setDepartments((prev) => prev.map((dept) => {
+      if (dept.id !== selectedDepartmentId) return dept
+      return {
+        ...dept,
+        semesters: dept.semesters.map((semester) => {
+          if (semester.id === selectedSemesterId) {
+            return {
+              ...semester,
+              subjects: semester.subjects.filter((subject) => subject.id !== modalState.subjectId)
+            }
+          }
+          if (semester.id === shiftTargetId) {
+            return {
+              ...semester,
+              subjects: [...semester.subjects, { ...subjectToMove, semester_id: shiftTargetId }]
+            }
+          }
+          return semester
+        })
+      }
+    }))
+    setSelectedSemesterId(shiftTargetId)
+    closeModal()
   }
 
   async function handleCreateSemester(event){
@@ -423,10 +465,10 @@ export default function SubjectsPage(){
                     </div>
                   </div>
                   <div className="subject-actions">
-                    <button className="text-button" onClick={() => openEditModal(subject)}>Edit</button>
-                    <button className="text-button" onClick={() => openShiftModal(subject)}>Shift</button>
-                    <button className="text-button" onClick={() => openPdfModal(subject)}>Upload PDF</button>
-                    <button className="text-button" onClick={() => openContentModal(subject)}>Add content</button>
+                    <button className="text-button" type="button" onClick={() => openEditModal(subject)}>Edit</button>
+                    <button className="text-button" type="button" onClick={() => openShiftModal(subject)}>Shift</button>
+                    <button className="text-button" type="button" onClick={() => openPdfModal(subject)}>Upload PDF</button>
+                    <button className="text-button" type="button" onClick={() => openContentModal(subject)}>Add content</button>
                   </div>
                 </article>
               ))}
@@ -489,7 +531,7 @@ export default function SubjectsPage(){
             </div>
 
             {modalState.type === 'shift' ? (
-              <form className="modal-form" onSubmit={(event) => { event.preventDefault(); closeModal() }}>
+              <form className="modal-form" onSubmit={handleShiftSubject}>
                 <label>
                   Move to another semester
                   <select value={shiftTargetId} onChange={(event) => setShiftTargetId(event.target.value)}>

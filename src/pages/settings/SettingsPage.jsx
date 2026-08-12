@@ -23,6 +23,14 @@ export default function SettingsPage(){
       setIsAdmin(userIsAdmin)
     } catch (err) {
       console.error('Error checking admin status:', err)
+      console.error('Full error object:', JSON.stringify({
+        status: err?.response?.status,
+        statusText: err?.response?.statusText,
+        data: err?.response?.data,
+        message: err?.message,
+        url: err?.config?.url,
+      }, null, 2))
+      setStatus(`Failed to check admin status: ${err?.message || 'Network error'}`)
     } finally {
       setCheckingRole(false)
     }
@@ -38,6 +46,12 @@ export default function SettingsPage(){
       setIsAdmin(true)
     } catch (err) {
       console.error('Error promoting to admin:', err)
+      console.error('Full error:', JSON.stringify({
+        status: err?.response?.status,
+        data: err?.response?.data,
+        message: err?.message,
+        config: err?.config?.url,
+      }, null, 2))
       const errorDetail = err?.response?.data?.detail || err?.message || 'Unable to promote to admin.'
       setStatus(`Error: ${errorDetail}`)
     } finally {

@@ -252,22 +252,30 @@ export default function SubjectsPage(){
     event.preventDefault()
     if (!modalState?.subjectId || !shiftTargetId) return
 
-    const subjectToMove = selectedSemester?.subjects.find((subject) => subject.id === modalState.subjectId)
+    const currentDepartment = departments.find((dept) => dept.id === selectedDepartmentId)
+    if (!currentDepartment) return
+
+    const sourceSemester = currentDepartment.semesters.find((semester) =>
+      semester.subjects.some((subject) => subject.id === modalState.subjectId)
+    )
+    const targetSemester = currentDepartment.semesters.find((semester) => semester.id === shiftTargetId)
+    if (!sourceSemester || !targetSemester) return
+
+    const subjectToMove = sourceSemester.subjects.find((subject) => subject.id === modalState.subjectId)
     if (!subjectToMove) return
 
-    updateSubject(modalState.subjectId, { semester_id: shiftTargetId })
     setDepartments((prev) => prev.map((dept) => {
       if (dept.id !== selectedDepartmentId) return dept
       return {
         ...dept,
         semesters: dept.semesters.map((semester) => {
-          if (semester.id === selectedSemesterId) {
+          if (semester.id === sourceSemester.id) {
             return {
               ...semester,
               subjects: semester.subjects.filter((subject) => subject.id !== modalState.subjectId)
             }
           }
-          if (semester.id === shiftTargetId) {
+          if (semester.id === targetSemester.id) {
             return {
               ...semester,
               subjects: [...semester.subjects, { ...subjectToMove, semester_id: shiftTargetId }]
@@ -277,7 +285,10 @@ export default function SubjectsPage(){
         })
       }
     }))
-    setSelectedSemesterId(shiftTargetId)
+
+    if (selectedSemesterId === sourceSemester.id) {
+      setSelectedSemesterId(shiftTargetId)
+    }
     closeModal()
   }
 

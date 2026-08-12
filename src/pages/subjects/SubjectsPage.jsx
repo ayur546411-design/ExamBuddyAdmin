@@ -218,11 +218,10 @@ export default function SubjectsPage(){
     setError('')
     try {
       if (modalState?.type === 'edit' && modalState.subjectId) {
-        updateSubject(modalState.subjectId, {
+        await persistSubjectUpdate(modalState.subjectId, {
           name: formState.name.trim(),
           code: formState.code.trim(),
-          description: formState.description.trim() || formState.content.trim(),
-          content: formState.content.trim()
+          description: formState.description.trim() || formState.content.trim()
         })
       } else {
         await api.post('/subjects/', {
@@ -237,7 +236,7 @@ export default function SubjectsPage(){
           semester_id: selectedSemester.id,
           is_active: true
         })
-        await loadData()
+        await loadDepartmentData(selectedDepartment.id)
       }
       closeModal()
     } catch (err) {
@@ -248,7 +247,7 @@ export default function SubjectsPage(){
     }
   }
 
-  function handleShiftSubject(event){
+  async function handleShiftSubject(event){
     event.preventDefault()
     if (!modalState?.subjectId || !shiftTargetId) return
 
@@ -264,32 +263,45 @@ export default function SubjectsPage(){
     const subjectToMove = sourceSemester.subjects.find((subject) => subject.id === modalState.subjectId)
     if (!subjectToMove) return
 
-    setDepartments((prev) => prev.map((dept) => {
-      if (dept.id !== selectedDepartmentId) return dept
-      return {
-        ...dept,
-        semesters: dept.semesters.map((semester) => {
-          if (semester.id === sourceSemester.id) {
-            return {
-              ...semester,
-              subjects: semester.subjects.filter((subject) => subject.id !== modalState.subjectId)
-            }
-          }
-          if (semester.id === targetSemester.id) {
-            return {
-              ...semester,
-              subjects: [...semester.subjects, { ...subjectToMove, semester_id: shiftTargetId }]
-            }
-          }
-          return semester
-        })
-      }
-    }))
+    setSaving(true)
+    setError('')
+    try {
+      await api.put(`/subjects/${modalState.subjectId}`, {
+        semester_id: shiftTargetId
+      })
 
-    if (selectedSemesterId === sourceSemester.id) {
-      setSelectedSemesterId(shiftTargetId)
+      setDepartments((prev) => prev.map((dept) => {
+        if (dept.id !== selectedDepartmentId) return dept
+        return {
+          ...dept,
+          semesters: dept.semesters.map((semester) => {
+            if (semester.id === sourceSemester.id) {
+              return {
+                ...semester,
+                subjects: semester.subjects.filter((subject) => subject.id !== modalState.subjectId)
+              }
+            }
+            if (semester.id === targetSemester.id) {
+              return {
+                ...semester,
+                subjects: [...semester.subjects, { ...subjectToMove, semester_id: shiftTargetId }]
+              }
+            }
+            return semester
+          })
+        }
+      }))
+
+      if (selectedSemesterId === sourceSemester.id) {
+        setSelectedSemesterId(shiftTargetId)
+      }
+      closeModal()
+    } catch (err) {
+      console.error('Failed to shift subject', err)
+      setError(err?.response?.data?.detail || 'Could not shift subject')
+    } finally {
+      setSaving(false)
     }
-    closeModal()
   }
 
   async function handleCreateSemester(event){
@@ -320,7 +332,26 @@ export default function SubjectsPage(){
     }
   }
 
-  function updateSubject(subjectId, patch){
+  async function persistSubjectUpdate(subjectId, patch){
+    const response = await api.put(`/subjects/${subjectId}`, patch)
+    const updatedSubject = response.data
+
+    setDepartments((prev) => prev.map((dept) => {
+      if (dept.id !== selectedDepartmentId) return dept
+      return {
+        ...dept,
+        semesters: dept.semesters.map((semester) => {
+          if (semester.id !== selectedSemesterId) return semester
+          return {
+            ...semester,
+            subjects: semester.subjects.map((subject) => subject.id === subjectId ? { ...subject, ...updatedSubject } : subject)
+          }
+        })
+      }
+    }))
+  }
+
+  function updateLocalSubject(subjectId, patch){
     setDepartments((prev) => prev.map((dept) => {
       if (dept.id !== selectedDepartmentId) return dept
       return {
@@ -339,7 +370,7 @@ export default function SubjectsPage(){
   function handleContentSave(event){
     event.preventDefault()
     if (!modalState?.subjectId) return
-    updateSubject(modalState.subjectId, { content: formState.content.trim() })
+    updateLocalSubject(modalState.subjectId, { content: formState.content.trim() })
     closeModal()
   }
 
@@ -347,7 +378,7 @@ export default function SubjectsPage(){
     event.preventDefault()
     if (!modalState?.subjectId || !pdfFile) return
     const objectUrl = typeof window !== 'undefined' ? window.URL.createObjectURL(pdfFile) : ''
-    updateSubject(modalState.subjectId, {
+    updateLocalSubject(modalState.subjectId, {
       pdfName: pdfFile.name,
       pdfUrl: objectUrl
     })

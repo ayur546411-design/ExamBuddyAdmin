@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import api from '../../api/client'
 import { getDocuments, reprocessDocument, publishDocument } from '../../api/documentsApi'
 import StatusBadge from '../../components/StatusBadge'
 
@@ -12,19 +13,68 @@ export default function DocumentsPage(){
   const [statusFilter, setStatusFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
   const [search, setSearch] = useState('')
+  const [departments, setDepartments] = useState([])
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('')
+  const [semesters, setSemesters] = useState([])
+  const [selectedSemesterId, setSelectedSemesterId] = useState('')
+  const [pageSize, setPageSize] = useState('25')
 
   useEffect(()=>{
     async function load(){
       setLoading(true)
       try{
-        const res = await getDocuments({ document_type: typeFilter || undefined, page: 1, page_size: 25 })
+        const params = {
+          document_type: typeFilter || undefined,
+          page: 1,
+          page_size: pageSize === 'all' ? 0 : Number(pageSize || 25),
+          department_id: selectedDepartmentId || undefined,
+          semester_id: selectedSemesterId || undefined
+        }
+        const res = await getDocuments(params)
         setDocs(res.data || [])
       }catch(e){
         console.error(e)
       }finally{ setLoading(false) }
     }
     load()
-  }, [typeFilter])
+  }, [typeFilter, pageSize, selectedDepartmentId, selectedSemesterId])
+
+  useEffect(() => {
+    async function loadDepartments(){
+      try{
+        const schoolsRes = await api.get('/schools/')
+        const schools = schoolsRes.data || []
+        const deptRows = []
+        for(const school of schools){
+          const departmentsRes = await api.get(`/schools/${school.id}/departments/`)
+          const departmentsForSchool = departmentsRes.data || []
+          deptRows.push(...departmentsForSchool.map((d)=>({ ...d, schoolName: school.name, school_id: d.school_id || school.id })))
+        }
+        setDepartments(deptRows)
+        if(deptRows.length){
+          setSelectedDepartmentId((cur) => cur || deptRows[0].id)
+        }
+      }catch(e){
+        console.error('Failed to load departments for filters', e)
+      }
+    }
+    loadDepartments()
+  }, [])
+
+  useEffect(() => {
+    async function loadSemesters(){
+      if(!selectedDepartmentId) { setSemesters([]); setSelectedSemesterId(''); return }
+      try{
+        const res = await api.get('/semesters/', { params: { department_id: selectedDepartmentId } })
+        const sems = res.data || []
+        setSemesters(sems)
+        setSelectedSemesterId((cur) => cur || (sems[0]?.id || ''))
+      }catch(e){
+        console.error('Failed to load semesters for department', e)
+      }
+    }
+    loadSemesters()
+  }, [selectedDepartmentId])
 
   const filteredDocs = useMemo(()=>{
     return docs.filter(doc => {
@@ -66,6 +116,20 @@ export default function DocumentsPage(){
 
       <div className="filter-bar">
         <div>
+          <label>Department</label>
+          <select value={selectedDepartmentId} onChange={e=>{ setSelectedDepartmentId(e.target.value); setSelectedSemesterId('') }}>
+            <option value="">All</option>
+            {departments.map(d=> <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label>Semester</label>
+          <select value={selectedSemesterId} onChange={e=>setSelectedSemesterId(e.target.value)}>
+            <option value="">All</option>
+            {semesters.map(s=> <option key={s.id} value={s.id}>{`Semester ${s.semester_number} ${s.academic_year || ''}`}</option>)}
+          </select>
+        </div>
+        <div>
           <label>Status</label>
           <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}>
             {statusOptions.map(option => <option key={option} value={option}>{option || 'All'}</option>)}
@@ -75,6 +139,14 @@ export default function DocumentsPage(){
           <label>Type</label>
           <select value={typeFilter} onChange={e=>setTypeFilter(e.target.value)}>
             {typeOptions.map(option => <option key={option} value={option}>{option || 'All'}</option>)}
+          </select>
+        </div>
+        <div>
+          <label>Page size</label>
+          <select value={pageSize} onChange={e=>setPageSize(e.target.value)}>
+            <option value="25">25</option>
+            <option value="100">100</option>
+            <option value="all">All</option>
           </select>
         </div>
         <div style={{ flex: 1 }}>

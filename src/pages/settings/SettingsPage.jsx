@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import api from '../../api/client'
 
 export default function SettingsPage(){
@@ -7,6 +7,43 @@ export default function SettingsPage(){
   const [targetUserId, setTargetUserId] = useState('')
   const [status, setStatus] = useState('')
   const [saving, setSaving] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [checkingRole, setCheckingRole] = useState(true)
+
+  useEffect(() => {
+    checkAdminStatus()
+  }, [])
+
+  async function checkAdminStatus(){
+    try {
+      setCheckingRole(true)
+      const response = await api.get('/users/me')
+      const user = response.data
+      const userIsAdmin = user.role === 'admin' || user.is_admin
+      setIsAdmin(userIsAdmin)
+    } catch (err) {
+      console.error('Error checking admin status:', err)
+    } finally {
+      setCheckingRole(false)
+    }
+  }
+
+  async function promoteToAdmin(){
+    try {
+      setSaving(true)
+      setStatus('')
+      console.log('Promoting user to admin...')
+      await api.post('/users/me/promote-to-admin')
+      setStatus('Successfully promoted to admin! You can now send notifications.')
+      setIsAdmin(true)
+    } catch (err) {
+      console.error('Error promoting to admin:', err)
+      const errorDetail = err?.response?.data?.detail || err?.message || 'Unable to promote to admin.'
+      setStatus(`Error: ${errorDetail}`)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   async function handleSendNotification(e){
     e.preventDefault()
@@ -18,11 +55,20 @@ export default function SettingsPage(){
     try {
       setSaving(true)
       setStatus('')
-      const payload = { title: title.trim(), body: body.trim(), user_id: targetUserId.trim() || undefined }
-      if (targetUserId.trim()) {
+      const titleTrimmed = title.trim()
+      const bodyTrimmed = body.trim()
+      const userIdTrimmed = targetUserId.trim()
+      
+      if (userIdTrimmed) {
+        // Send to specific user
+        const payload = { title: titleTrimmed, body: bodyTrimmed, user_id: userIdTrimmed }
+        console.log('Sending notification to user:', payload)
         await api.post('/notifications/', payload)
         setStatus('Notification sent.')
       } else {
+        // Broadcast to all users - don't include user_id
+        const payload = { title: titleTrimmed, body: bodyTrimmed }
+        console.log('Broadcasting notification:', payload)
         await api.post('/notifications/broadcast', payload)
         setStatus('Broadcast sent to all active users.')
       }
@@ -30,8 +76,17 @@ export default function SettingsPage(){
       setBody('')
       setTargetUserId('')
     } catch (err) {
-      console.error(err)
-      setStatus(err?.response?.data?.detail || 'Unable to send notification.')
+      console.error('Error sending notification:', err)
+      console.error('Response data:', err?.response?.data)
+      console.error('Error message:', err?.message)
+      const errorDetail = err?.response?.data?.detail || err?.message || 'Unable to send notification.'
+      
+      // If 403 and not admin, offer to promote
+      if (err?.response?.status === 403 && !isAdmin) {
+        setStatus(`Error: ${errorDetail} - Click "Promote to Admin" below to enable this feature.`)
+      } else {
+        setStatus(`Error: ${errorDetail}`)
+      }
     } finally {
       setSaving(false)
     }
@@ -57,25 +112,50 @@ export default function SettingsPage(){
         <h2>Send announcement</h2>
         <p>Publish a notice to the mobile app without hardcoding anything in the app UI.</p>
 
-        <form onSubmit={handleSendNotification} style={{ display: 'grid', gap: 12, marginTop: 16 }}>
-          <div>
-            <label htmlFor="notif-title">Title</label>
-            <input id="notif-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Welcome back" style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db' }} />
+        {checkingRole ? (
+          <p>Checking admin privileges...</p>
+        ) : !isAdmin ? (
+          <div style={{ backgroundColor: '#fef3c7', padding: 12, borderRadius: 8, marginBottom: 16, border: '1px solid #fcd34d' }}>
+            <p style={{ margin: 0, marginBottom: 8, color: '#92400e' }}>
+              <strong>Admin privileges required:</strong> You need to be promoted to admin to send announcements.
+            </p>
+            <button 
+              onClick={promoteToAdmin} 
+              disabled={saving}
+              style={{ padding: '8px 16px', borderRadius: 6, border: 'none', backgroundColor: '#fbbf24', color: '#000', cursor: saving ? 'not-allowed' : 'pointer', fontWeight: 500 }}
+            >
+              {saving ? 'Promoting...' : 'Promote to Admin'}
+            </button>
           </div>
-          <div>
-            <label htmlFor="notif-body">Message</label>
-            <textarea id="notif-body" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Final exam schedule is now available." rows={4} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', resize: 'vertical' }} />
-          </div>
-          <div>
-            <label htmlFor="notif-user">Target user ID (optional)</label>
-            <input id="notif-user" value={targetUserId} onChange={(e) => setTargetUserId(e.target.value)} placeholder="Leave blank for everyone" style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db' }} />
-          </div>
+        ) : null}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <button type="submit" className="btn" disabled={saving}>{saving ? 'Sending...' : 'Send notification'}</button>
-            {status ? <span>{status}</span> : null}
+        {isAdmin && (
+          <form onSubmit={handleSendNotification} style={{ display: 'grid', gap: 12, marginTop: 16 }}>
+            <div>
+              <label htmlFor="notif-title">Title</label>
+              <input id="notif-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Welcome back" style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db' }} />
+            </div>
+            <div>
+              <label htmlFor="notif-body">Message</label>
+              <textarea id="notif-body" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Final exam schedule is now available." rows={4} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db', resize: 'vertical' }} />
+            </div>
+            <div>
+              <label htmlFor="notif-user">Target user ID (optional)</label>
+              <input id="notif-user" value={targetUserId} onChange={(e) => setTargetUserId(e.target.value)} placeholder="Leave blank for everyone" style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #d1d5db' }} />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <button type="submit" className="btn" disabled={saving}>{saving ? 'Sending...' : 'Send notification'}</button>
+              {status ? <span>{status}</span> : null}
+            </div>
+          </form>
+        )}
+
+        {!isAdmin && !checkingRole && status && (
+          <div style={{ marginTop: 16 }}>
+            <span>{status}</span>
           </div>
-        </form>
+        )}
       </section>
     </div>
   )

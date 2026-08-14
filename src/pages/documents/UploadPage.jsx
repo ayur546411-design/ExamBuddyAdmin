@@ -88,8 +88,12 @@ export default function UploadPage(){
     const f = e.target.files[0]
     setError(null)
     if(!f) return
-    if(f.type !== 'application/pdf'){
-      setError('Only PDF files are allowed')
+
+    const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp']
+    const isAllowed = allowedTypes.includes(f.type) || /\.(pdf|png|jpe?g|webp)$/i.test(f.name)
+
+    if(!isAllowed){
+      setError('Only PDF, PNG, JPG, JPEG, and WEBP files are allowed')
       return
     }
     if(f.size > MAX_SIZE){
@@ -101,11 +105,13 @@ export default function UploadPage(){
 
   async function handleSubmit(e){
     e.preventDefault()
-    if(!file){ setError('Select a PDF file'); return }
+    const requiresFile = form.document_type !== 'pyq' || !form.pdf_url
+    if(requiresFile && !file){ setError('Select a PDF or image file'); return }
+    if(form.document_type === 'pyq' && !file && !form.pdf_url){ setError('Select a PYQ PDF/image file or provide a direct PDF URL'); return }
     if(!form.school_id || !form.department_id){ setError('Please select school and department'); return }
 
     const fd = new FormData()
-    fd.append('file', file)
+    if(file){ fd.append('file', file) }
     fd.append('school_id', form.school_id)
     fd.append('department_id', form.department_id)
     fd.append('semester_id', form.semester_id)
@@ -223,8 +229,8 @@ export default function UploadPage(){
         </div>
 
         <div style={{ gridColumn: 'span 2' }}>
-          <label>PDF File</label>
-          <input type="file" accept="application/pdf" onChange={handleFile} />
+          <label>PDF / Image File</label>
+          <input type="file" accept=".pdf,image/png,image/jpeg,image/jpg,image/webp" onChange={handleFile} />
           {file && <div className="file-summary">{file.name} · {Math.round(file.size / 1024)} KB</div>}
         </div>
 

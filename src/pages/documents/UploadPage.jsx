@@ -27,7 +27,7 @@ export default function UploadPage(){
   const [error, setError] = useState(null)
   const [progress, setProgress] = useState(0)
   const [uploading, setUploading] = useState(false)
-  const MAX_SIZE = 20 * 1024 * 1024
+  const MAX_SIZE = 10 * 1024 * 1024  // 10 MB to match Cloudinary free tier limit
 
   useEffect(()=>{
     async function loadSchools(){
@@ -229,7 +229,7 @@ export default function UploadPage(){
         </div>
 
         <div style={{ gridColumn: 'span 2' }}>
-          <label>PDF / Image File</label>
+          <label>PDF / Image File <span style={{ fontSize: '0.85em', color: '#666' }}>(Max 10 MB)</span></label>
           <input type="file" accept=".pdf,image/png,image/jpeg,image/jpg,image/webp" onChange={handleFile} />
           {file && <div className="file-summary">{file.name} · {Math.round(file.size / 1024)} KB</div>}
         </div>

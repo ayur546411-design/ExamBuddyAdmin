@@ -105,9 +105,19 @@ export default function UploadPage(){
 
   async function handleSubmit(e){
     e.preventDefault()
-    const requiresFile = form.document_type !== 'pyq' || !form.pdf_url
-    if(requiresFile && !file){ setError('Select a PDF or image file'); return }
-    if(form.document_type === 'pyq' && !file && !form.pdf_url){ setError('Select a PYQ PDF/image file or provide a direct PDF URL'); return }
+    const hasYoutubeUrl = Boolean((form.youtube_url || '').trim())
+    const hasDirectPdfUrl = Boolean((form.pdf_url || '').trim())
+
+    if(form.document_type !== 'pyq' && !file){
+      setError('Select a PDF or image file')
+      return
+    }
+
+    if(form.document_type === 'pyq' && !file && !hasDirectPdfUrl && !hasYoutubeUrl){
+      setError('Select a PYQ PDF/image file, provide a direct PDF URL, or add a YouTube video URL')
+      return
+    }
+
     if(!form.school_id || !form.department_id){ setError('Please select school and department'); return }
 
     const fd = new FormData()

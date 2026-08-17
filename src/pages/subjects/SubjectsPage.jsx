@@ -209,8 +209,20 @@ export default function SubjectsPage(){
 
   async function handleSaveSubject(event){
     event.preventDefault()
-    if (!formState.name.trim() || !formState.code.trim() || !selectedDepartment || !selectedSemester) {
+    const trimmedName = formState.name.trim()
+    const trimmedCode = formState.code.trim()
+    const trimmedDescription = (formState.description || '').trim() || (formState.content || '').trim()
+
+    if (!selectedDepartment || !selectedSemester) {
       setError('Select a department and semester before saving a subject.')
+      return
+    }
+    if (!trimmedName) {
+      setError('Subject name is required before saving.')
+      return
+    }
+    if (!trimmedCode) {
+      setError('Subject code is required before saving.')
       return
     }
 
@@ -219,15 +231,15 @@ export default function SubjectsPage(){
     try {
       if (modalState?.type === 'edit' && modalState.subjectId) {
         await persistSubjectUpdate(modalState.subjectId, {
-          name: formState.name.trim(),
-          code: formState.code.trim(),
-          description: formState.description.trim() || formState.content.trim()
+          name: trimmedName,
+          code: trimmedCode,
+          description: trimmedDescription
         })
       } else {
-        await api.post('/subjects/', {
-          name: formState.name.trim(),
-          code: formState.code.trim(),
-          description: formState.description.trim() || formState.content.trim(),
+        const response = await api.post('/subjects/', {
+          name: trimmedName,
+          code: trimmedCode,
+          description: trimmedDescription,
           credits: 0,
           faculty_name: '',
           subject_type: 'theory',
@@ -236,12 +248,17 @@ export default function SubjectsPage(){
           semester_id: selectedSemester.id,
           is_active: true
         })
-        await loadDepartmentData(selectedDepartment.id)
+
+        if (response?.data?.id) {
+          await loadDepartmentData(selectedDepartment.id)
+        }
       }
       closeModal()
     } catch (err) {
+      const backendDetail = err?.response?.data?.detail || err?.response?.data?.message
+      const friendlyMessage = backendDetail || 'The subject could not be saved because the data conflicts with an existing subject in this department/semester.'
       console.error('Failed to save subject', err)
-      setError(err?.response?.data?.detail || 'Could not save subject')
+      setError(friendlyMessage)
     } finally {
       setSaving(false)
     }

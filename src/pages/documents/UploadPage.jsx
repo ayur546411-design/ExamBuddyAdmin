@@ -21,6 +21,7 @@ export default function UploadPage(){
   const [schools, setSchools] = useState([])
   const [departments, setDepartments] = useState([])
   const [semesters, setSemesters] = useState([])
+  const [academicYears, setAcademicYears] = useState([])
   const [subjects, setSubjects] = useState([])
   const [form, setForm] = useState({ school_id: '', department_id: '', semester_id: '', subject_id: '', document_type: 'syllabus', title: '', academic_year: '', exam_type: '', pdf_url: '', youtube_url: '', video_title: '', description: '' })
   const [file, setFile] = useState(null)
@@ -28,6 +29,29 @@ export default function UploadPage(){
   const [progress, setProgress] = useState(0)
   const [uploading, setUploading] = useState(false)
   const MAX_SIZE = 10 * 1024 * 1024  // 10 MB to match Cloudinary free tier limit
+
+  function normalizeSemesterOptions(semesterRows = []){
+    const byNumber = new Map()
+
+    for (const semester of semesterRows) {
+      const semesterNumber = Number(semester.semester_number)
+      if (!Number.isInteger(semesterNumber) || semesterNumber < 1) continue
+
+      const existing = byNumber.get(semesterNumber)
+      if (!existing) {
+        byNumber.set(semesterNumber, { ...semester, semester_number: semesterNumber })
+        continue
+      }
+
+      const existingYear = String(existing.academic_year || '').trim()
+      const incomingYear = String(semester.academic_year || '').trim()
+      if (!existingYear && incomingYear) {
+        byNumber.set(semesterNumber, { ...semester, semester_number: semesterNumber })
+      }
+    }
+
+    return [...byNumber.values()].sort((a, b) => Number(a.semester_number) - Number(b.semester_number))
+  }
 
   useEffect(()=>{
     async function loadSchools(){
@@ -43,12 +67,38 @@ export default function UploadPage(){
 
   useEffect(()=>{
     async function loadSemesters(){
-      if(!form.department_id) return
+      if(!form.department_id){
+        setSemesters([])
+        setAcademicYears([])
+        return
+      }
       try{
-        const res = await api.get('/semesters')
-        setSemesters(res.data || [])
+        const res = await api.get('/semesters/', { params: { department_id: form.department_id } })
+        const semesterRows = res.data || []
+        const dedupedSemesters = normalizeSemesterOptions(semesterRows)
+        const years = [...new Set(dedupedSemesters
+          .map(semester => String(semester.academic_year || '').trim())
+          .filter(Boolean))]
+          .sort((a, b) => b.localeCompare(a))
+
+        setSemesters(dedupedSemesters)
+        setAcademicYears(years)
+
+        setForm(prev => {
+          const selectedSemesterStillValid = dedupedSemesters.some(semester => semester.id === prev.semester_id)
+          const selectedYearStillValid = !prev.academic_year || years.length === 0 || years.includes(String(prev.academic_year).trim())
+
+          return {
+            ...prev,
+            academic_year: selectedYearStillValid ? (prev.academic_year || years[0] || '') : '',
+            semester_id: selectedSemesterStillValid ? prev.semester_id : '',
+            subject_id: selectedSemesterStillValid ? prev.subject_id : ''
+          }
+        })
       }catch(e){
         console.error(e)
+        setSemesters([])
+        setAcademicYears([])
       }
     }
     loadSemesters()
@@ -68,9 +118,10 @@ export default function UploadPage(){
   }, [form.semester_id])
 
   async function handleSchoolChange(schoolId){
-    setForm(prev => ({ ...prev, school_id: schoolId, department_id: '', semester_id: '', subject_id: '' }))
+    setForm(prev => ({ ...prev, school_id: schoolId, department_id: '', academic_year: '', semester_id: '', subject_id: '' }))
     setDepartments([])
     setSemesters([])
+    setAcademicYears([])
     setSubjects([])
     if(!schoolId) return
     try{
@@ -161,7 +212,7 @@ export default function UploadPage(){
         </div>
       </div>
 
-      <form className="card form-grid" onSubmit={handleSubmit}>
+      <form className="card form-grid" onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', alignItems: 'end' }}>
         <div>
           <label>School</label>
           <select value={form.school_id} onChange={e=>handleSchoolChange(e.target.value)}>
@@ -172,17 +223,29 @@ export default function UploadPage(){
 
         <div>
           <label>Department</label>
-          <select value={form.department_id} onChange={e=>setForm(prev=>({ ...prev, department_id: e.target.value, semester_id: '', subject_id: '' }))}>
+          <select value={form.department_id} onChange={e=>setForm(prev=>({ ...prev, department_id: e.target.value, academic_year: '', semester_id: '', subject_id: '' }))}>
             <option value="">Select department</option>
             {departments.map(d=> <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
         </div>
 
         <div>
+          <label>Academic Year</label>
+          {academicYears.length > 0 ? (
+            <select value={form.academic_year} onChange={e=>setForm(prev=>({ ...prev, academic_year: e.target.value }))}>
+              <option value="">Select academic year</option>
+              {academicYears.map(year => <option key={year} value={year}>{year}</option>)}
+            </select>
+          ) : (
+            <input value={form.academic_year} onChange={e=>setForm(prev=>({ ...prev, academic_year: e.target.value }))} placeholder="e.g. 2024-2025" />
+          )}
+        </div>
+
+        <div>
           <label>Semester</label>
           <select value={form.semester_id} onChange={e=>setForm(prev=>({ ...prev, semester_id: e.target.value, subject_id: '' }))}>
             <option value="">Select semester</option>
-            {semesters.map(s=> <option key={s.id} value={s.id}>{s.semester_number || s.id}</option>)}
+            {semesters.map(s=> <option key={s.id} value={s.id}>{`Semester ${s.semester_number}`}</option>)}
           </select>
         </div>
 
@@ -201,9 +264,10 @@ export default function UploadPage(){
           </select>
         </div>
 
-        <div>
-          <label>Academic Year</label>
-          <input value={form.academic_year} onChange={e=>setForm(prev=>({ ...prev, academic_year: e.target.value }))} placeholder="e.g. 2024-2025" />
+        <div style={{ gridColumn: 'span 2' }}>
+          <label>PDF / Image File <span style={{ fontSize: '0.85em', color: '#666' }}>(Max 10 MB)</span></label>
+          <input type="file" accept=".pdf,image/png,image/jpeg,image/jpg,image/webp" onChange={handleFile} />
+          {file && <div className="file-summary">{file.name} · {Math.round(file.size / 1024)} KB</div>}
         </div>
 
         <div style={{ gridColumn: 'span 2' }}>
@@ -213,7 +277,7 @@ export default function UploadPage(){
 
         <div style={{ gridColumn: 'span 2' }}>
           <label>Description</label>
-          <input value={form.description} onChange={e=>setForm(prev=>({ ...prev, description: e.target.value }))} placeholder="Optional description" />
+          <textarea value={form.description} onChange={e=>setForm(prev=>({ ...prev, description: e.target.value }))} placeholder="Optional description" rows={3} />
         </div>
 
         <div>
@@ -236,12 +300,6 @@ export default function UploadPage(){
         <div>
           <label>Video Title</label>
           <input value={form.video_title} onChange={e=>setForm(prev=>({ ...prev, video_title: e.target.value }))} placeholder="Optional video label" />
-        </div>
-
-        <div style={{ gridColumn: 'span 2' }}>
-          <label>PDF / Image File <span style={{ fontSize: '0.85em', color: '#666' }}>(Max 10 MB)</span></label>
-          <input type="file" accept=".pdf,image/png,image/jpeg,image/jpg,image/webp" onChange={handleFile} />
-          {file && <div className="file-summary">{file.name} · {Math.round(file.size / 1024)} KB</div>}
         </div>
 
         {error && <div className="error" style={{ gridColumn: 'span 2' }}>{error}</div>}

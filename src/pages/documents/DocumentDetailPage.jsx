@@ -292,6 +292,8 @@ export default function DocumentDetailPage(){
         status: doc.status,
         semester_id: doc.semester_id,
         subject_id: doc.subject_id,
+        youtube_url: doc.youtube_url || '',
+        video_title: doc.video_title || '',
         structured_json: parsed
       }
       await updateDocument(id, data)
@@ -350,6 +352,8 @@ export default function DocumentDetailPage(){
           <div className="form-group"><label>Description</label><textarea rows={3} value={doc.description || ''} onChange={e=>updateMetadata('description', e.target.value)} /></div>
           <div className="form-group"><label>Academic year</label><input value={doc.academic_year || ''} onChange={e=>updateMetadata('academic_year', e.target.value)} /></div>
           <div className="form-group"><label>Keywords</label><input value={doc.keywords || ''} onChange={e=>updateMetadata('keywords', e.target.value)} /></div>
+          <div className="form-group"><label>PYQ solution video URL</label><input value={doc.youtube_url || ''} onChange={e=>updateMetadata('youtube_url', e.target.value)} placeholder="https://www.youtube.com/watch?v=..." /></div>
+          <div className="form-group"><label>Video title</label><input value={doc.video_title || ''} onChange={e=>updateMetadata('video_title', e.target.value)} placeholder="Optional video label" /></div>
           <div className="form-group"><label>Status</label><select value={doc.status || 'active'} onChange={e=>updateMetadata('status', e.target.value)}>
             {statusOptions.map(option => <option key={option} value={option}>{option}</option>)}
           </select></div>

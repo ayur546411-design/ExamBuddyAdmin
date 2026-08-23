@@ -9,6 +9,7 @@ const links = [
   { to: '/errors', label: 'Errors' },
   { to: '/audit', label: 'Audit Log' },
   { to: '/subjects', label: 'Subjects' },
+  { to: '/pyqs', label: 'PYQ Manager' },
   { to: '/users', label: 'Users' },
   { to: '/settings', label: 'Settings' }
 ]

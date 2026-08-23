@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import api from '../../api/client'
 
 export default function SubjectsPage(){
   const [departments, setDepartments] = useState([])
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState('')
-  const [selectedSemesterId, setSelectedSemesterId] = useState('')
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState(() => sessionStorage.getItem('subj_filter_dept') || '')
+  const [selectedSemesterId, setSelectedSemesterId] = useState(() => sessionStorage.getItem('subj_filter_sem') || '')
   const [modalState, setModalState] = useState(null)
   const [semesterModalOpen, setSemesterModalOpen] = useState(false)
   const [formState, setFormState] = useState({ name: '', code: '', description: '', content: '' })
@@ -14,6 +15,7 @@ export default function SubjectsPage(){
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [deleteSubjectState, setDeleteSubjectState] = useState(null)
 
   async function loadData(){
     setLoading(true)
@@ -33,7 +35,6 @@ export default function SubjectsPage(){
       if (deptRows.length) {
         const firstDept = deptRows[0]
         setSelectedDepartmentId((current) => current || firstDept.id)
-        setSelectedSemesterId('')
         setSemesterForm((prev) => ({ ...prev, department_id: firstDept.id }))
       } else {
         setSelectedDepartmentId('')
@@ -87,13 +88,6 @@ export default function SubjectsPage(){
           semesters: semesters.map((sem) => ({ ...sem, subjects: subjectsBySemester.get(sem.id) || [] }))
         }
       }))
-
-      if (departmentId === selectedDepartmentId) {
-        setSelectedSemesterId((current) => {
-          const found = semesters.find((sem) => sem.id === current)
-          return found ? current : semesters[0]?.id || ''
-        })
-      }
     } catch (err) {
       console.error('Failed to load department details', err)
       setError(err?.response?.data?.detail || 'Failed to load semesters and subjects for this department')
@@ -113,6 +107,11 @@ export default function SubjectsPage(){
   }, [selectedDepartmentId])
 
   useEffect(() => {
+    sessionStorage.setItem('subj_filter_dept', selectedDepartmentId)
+    sessionStorage.setItem('subj_filter_sem', selectedSemesterId)
+  }, [selectedDepartmentId, selectedSemesterId])
+
+  useEffect(() => {
     if (!departments.length) {
       setSelectedDepartmentId('')
       setSelectedSemesterId('')
@@ -123,17 +122,19 @@ export default function SubjectsPage(){
       setSelectedDepartmentId(departments[0].id)
       return
     }
-
-    const currentDepartment = departments.find((dept) => dept.id === selectedDepartmentId)
-    if (!currentDepartment) return
-    if (!selectedSemesterId || !currentDepartment.semesters.some((semester) => semester.id === selectedSemesterId)) {
-      setSelectedSemesterId(currentDepartment.semesters[0]?.id || '')
-    }
-  }, [departments, selectedDepartmentId, selectedSemesterId])
+  }, [departments, selectedDepartmentId])
 
   const selectedDepartment = useMemo(() => {
     return departments.find((dept) => dept.id === selectedDepartmentId) || departments[0] || null
   }, [departments, selectedDepartmentId])
+
+  const semestersToRender = useMemo(() => {
+    if (!selectedDepartment) return []
+    if (selectedSemesterId) {
+      return selectedDepartment.semesters.filter((sem) => sem.id === selectedSemesterId)
+    }
+    return selectedDepartment.semesters || []
+  }, [selectedDepartment, selectedSemesterId])
 
   const selectedSemester = useMemo(() => {
     if (!selectedDepartment) return null
@@ -154,10 +155,6 @@ export default function SubjectsPage(){
   }
 
   function openAddModal(){
-    if (!selectedSemester) {
-      setError('Add a semester first before creating subjects in this department.')
-      return
-    }
     setModalState({ type: 'add' })
     setFormState({ name: '', code: '', description: '', content: '' })
     setShiftTargetId('')
@@ -177,7 +174,7 @@ export default function SubjectsPage(){
   }
 
   function openShiftModal(subject){
-    const availableSemesters = selectedDepartment?.semesters.filter((semester) => semester.id !== selectedSemesterId) || []
+    const availableSemesters = selectedDepartment?.semesters.filter((semester) => semester.id !== subject.semester_id) || []
     setModalState({ type: 'shift', subjectId: subject.id })
     setShiftTargetId(availableSemesters[0]?.id || '')
     setPdfFile(null)
@@ -207,13 +204,63 @@ export default function SubjectsPage(){
     setPdfFile(null)
   }
 
+  async function openDeleteModal(subject) {
+    setDeleteSubjectState({ subject, warningInfo: null, loading: true, error: '' })
+    try {
+      const res = await api.delete(`/subjects/${subject.id}`, { params: { confirm: false } })
+      if (res.data?.status === 'warning') {
+        setDeleteSubjectState({
+          subject,
+          warningInfo: res.data,
+          loading: false,
+          error: ''
+        })
+      } else {
+        setDeleteSubjectState({
+          subject,
+          warningInfo: { status: 'safe', message: 'No documents are linked to this subject.' },
+          loading: false,
+          error: ''
+        })
+      }
+    } catch (err) {
+      console.error(err)
+      setDeleteSubjectState({
+        subject,
+        warningInfo: null,
+        loading: false,
+        error: err?.response?.data?.detail || 'Failed to check subject contents before deletion.'
+      })
+    }
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteSubjectState?.subject) return
+    const { subject } = deleteSubjectState
+    setDeleteSubjectState(prev => ({ ...prev, loading: true, error: '' }))
+    try {
+      await api.delete(`/subjects/${subject.id}`, { params: { confirm: true } })
+      await loadDepartmentData(selectedDepartmentId)
+      setDeleteSubjectState(null)
+    } catch (err) {
+      console.error(err)
+      setDeleteSubjectState(prev => ({
+        ...prev,
+        loading: false,
+        error: err?.response?.data?.detail || 'Failed to delete subject.'
+      }))
+    }
+  }
+
   async function handleSaveSubject(event){
     event.preventDefault()
     const trimmedName = formState.name.trim()
     const trimmedCode = formState.code.trim()
     const trimmedDescription = (formState.description || '').trim() || (formState.content || '').trim()
 
-    if (!selectedDepartment || !selectedSemester) {
+    // Determine destination semester
+    const targetSemId = selectedSemesterId || selectedDepartment?.semesters[0]?.id
+    if (!selectedDepartment || !targetSemId) {
       setError('Select a department and semester before saving a subject.')
       return
     }
@@ -245,7 +292,7 @@ export default function SubjectsPage(){
           subject_type: 'theory',
           school_id: selectedDepartment.school_id,
           department_id: selectedDepartment.id,
-          semester_id: selectedSemester.id,
+          semester_id: targetSemId,
           is_active: true
         })
 
@@ -271,14 +318,20 @@ export default function SubjectsPage(){
     const currentDepartment = departments.find((dept) => dept.id === selectedDepartmentId)
     if (!currentDepartment) return
 
-    const sourceSemester = currentDepartment.semesters.find((semester) =>
-      semester.subjects.some((subject) => subject.id === modalState.subjectId)
-    )
-    const targetSemester = currentDepartment.semesters.find((semester) => semester.id === shiftTargetId)
-    if (!sourceSemester || !targetSemester) return
+    let sourceSemester = null
+    let subjectToMove = null
 
-    const subjectToMove = sourceSemester.subjects.find((subject) => subject.id === modalState.subjectId)
-    if (!subjectToMove) return
+    for (const semester of currentDepartment.semesters) {
+      const found = semester.subjects.find((subject) => subject.id === modalState.subjectId)
+      if (found) {
+        sourceSemester = semester
+        subjectToMove = found
+        break
+      }
+    }
+
+    const targetSemester = currentDepartment.semesters.find((semester) => semester.id === shiftTargetId)
+    if (!sourceSemester || !targetSemester || !subjectToMove) return
 
     setSaving(true)
     setError('')
@@ -308,10 +361,6 @@ export default function SubjectsPage(){
           })
         }
       }))
-
-      if (selectedSemesterId === sourceSemester.id) {
-        setSelectedSemesterId(shiftTargetId)
-      }
       closeModal()
     } catch (err) {
       console.error('Failed to shift subject', err)
@@ -358,7 +407,7 @@ export default function SubjectsPage(){
       return {
         ...dept,
         semesters: dept.semesters.map((semester) => {
-          if (semester.id !== selectedSemesterId) return semester
+          if (!semester.subjects.some(s => s.id === subjectId)) return semester
           return {
             ...semester,
             subjects: semester.subjects.map((subject) => subject.id === subjectId ? { ...subject, ...updatedSubject } : subject)
@@ -374,7 +423,7 @@ export default function SubjectsPage(){
       return {
         ...dept,
         semesters: dept.semesters.map((semester) => {
-          if (semester.id !== selectedSemesterId) return semester
+          if (!semester.subjects.some(s => s.id === subjectId)) return semester
           return {
             ...semester,
             subjects: semester.subjects.map((subject) => subject.id === subjectId ? { ...subject, ...patch } : subject)
@@ -424,14 +473,14 @@ export default function SubjectsPage(){
           <div className="stat-card-subtitle">Current department scope</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card-title">Semester</div>
-          <div className="stat-card-value">{selectedSemester?.name || '—'}</div>
-          <div className="stat-card-subtitle">Current semester scope</div>
+          <div className="stat-card-title">Semester Filter</div>
+          <div className="stat-card-value">{selectedSemesterId ? `Semester ${selectedDepartment?.semesters.find(s=>s.id === selectedSemesterId)?.semester_number || ''}` : 'All Semesters'}</div>
+          <div className="stat-card-subtitle">Current semester filter</div>
         </div>
         <div className="stat-card">
-          <div className="stat-card-title">Subjects</div>
-          <div className="stat-card-value">{selectedSemester?.subjects.length || 0}</div>
-          <div className="stat-card-subtitle">Available in this semester</div>
+          <div className="stat-card-title">Total Subjects Listed</div>
+          <div className="stat-card-value">{semestersToRender.reduce((sum, sem) => sum + sem.subjects.length, 0)}</div>
+          <div className="stat-card-subtitle">Available in matching scope</div>
         </div>
       </div>
 
@@ -457,6 +506,9 @@ export default function SubjectsPage(){
                     <small>{department.semesters.reduce((sum, semester) => sum + semester.subjects.length, 0)} subjects</small>
                   </button>
                   <div className="tree-nested">
+                    <button className={`tree-node ${!selectedSemesterId && selectedDepartmentId === department.id ? 'active' : ''}`} onClick={() => { setSelectedDepartmentId(department.id); setSelectedSemesterId('') }}>
+                      <span>All Semesters</span>
+                    </button>
                     {department.semesters.map((semester) => (
                       <button key={semester.id} className={`tree-node ${selectedSemesterId === semester.id && selectedDepartmentId === department.id ? 'active' : ''}`} onClick={() => { setSelectedDepartmentId(department.id); setSelectedSemesterId(semester.id) }}>
                         <span>{semester.name}</span>
@@ -474,7 +526,7 @@ export default function SubjectsPage(){
           <div className="section-header">
             <div>
               <h3>{selectedDepartment?.name || 'Choose department'}</h3>
-              <p>{selectedSemester ? selectedSemester.name : (selectedDepartment ? 'Add a semester to view subjects' : 'Choose a department to view semesters')}</p>
+              <p>{selectedSemesterId ? `Viewing ${selectedSemester?.name}` : 'Viewing all semesters'}</p>
             </div>
             <div className="inline-controls">
               <label>
@@ -488,6 +540,7 @@ export default function SubjectsPage(){
               <label>
                 Semester
                 <select value={selectedSemesterId} onChange={(event) => setSelectedSemesterId(event.target.value)}>
+                  <option value="">All Semesters</option>
                   {(selectedDepartment?.semesters || []).map((semester) => (
                     <option key={semester.id} value={semester.id}>{semester.name}</option>
                   ))}
@@ -496,40 +549,53 @@ export default function SubjectsPage(){
             </div>
           </div>
 
-          {!selectedSemester ? (
+          {semestersToRender.length === 0 ? (
             <div className="empty-state">
               {selectedDepartment
                 ? 'This department has no semesters yet. Create one to start adding subjects.'
-                : 'Select a department and semester to start managing subjects.'}
+                : 'Select a department to start managing subjects.'}
             </div>
           ) : (
-            <div className="subject-list">
-              {selectedSemester.subjects.map((subject) => (
-                <article key={subject.id} className="subject-card">
-                  <div className="subject-card-header">
-                    <div>
-                      <h4>{subject.name}</h4>
-                      <p>{subject.description}</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              {semestersToRender.map((semester) => (
+                <div key={semester.id} className="semester-group-section" style={{ borderBottom: '1px solid #F3F4F6', paddingBottom: 20 }}>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#111827', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>{semester.name}</span>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: '#6B7280' }}>{semester.subjects.length} subjects</span>
+                  </h3>
+
+                  {semester.subjects.length === 0 ? (
+                    <div className="empty-state" style={{ padding: '16px' }}>No subjects added to this semester yet.</div>
+                  ) : (
+                    <div className="subject-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+                      {semester.subjects.map((subject) => (
+                        <article key={subject.id} className="subject-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <div className="subject-card-header">
+                            <div>
+                              <h4>
+                                <Link to={`/subjects/${subject.id}`} style={{ color: '#2563EB', textDecoration: 'none' }} className="subject-link-title">
+                                  {subject.name}
+                                </Link>
+                              </h4>
+                              <p>{subject.description || 'No description provided.'}</p>
+                            </div>
+                            <div className="subject-code">{subject.code}</div>
+                          </div>
+                          <div className="subject-card-body" style={{ marginTop: 12 }}>
+                            <div className="subject-meta">
+                              <span className="meta-pill success">View details & contents</span>
+                            </div>
+                          </div>
+                          <div className="subject-actions" style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                            <button className="text-button" type="button" onClick={() => openEditModal(subject)}>Edit</button>
+                            <button className="text-button" type="button" onClick={() => openShiftModal(subject)}>Shift</button>
+                            <button className="text-button" type="button" onClick={() => openDeleteModal(subject)} style={{ color: '#DC2626' }}>Delete</button>
+                          </div>
+                        </article>
+                      ))}
                     </div>
-                    <div className="subject-code">{subject.code}</div>
-                  </div>
-                  <div className="subject-card-body">
-                    <div className="subject-meta">
-                      <span className="meta-pill">Content ready</span>
-                      {subject.pdfName ? <span className="meta-pill success">PDF attached</span> : <span className="meta-pill">No PDF</span>}
-                    </div>
-                    <div className="subject-content">
-                      <strong>Notes</strong>
-                      <p>{subject.content || 'No content added yet.'}</p>
-                    </div>
-                  </div>
-                  <div className="subject-actions">
-                    <button className="text-button" type="button" onClick={() => openEditModal(subject)}>Edit</button>
-                    <button className="text-button" type="button" onClick={() => openShiftModal(subject)}>Shift</button>
-                    <button className="text-button" type="button" onClick={() => openPdfModal(subject)}>Upload PDF</button>
-                    <button className="text-button" type="button" onClick={() => openContentModal(subject)}>Add content</button>
-                  </div>
-                </article>
+                  )}
+                </div>
               ))}
             </div>
           )}
@@ -571,6 +637,56 @@ export default function SubjectsPage(){
                 <button className="btn primary" type="submit" disabled={saving}>{saving ? 'Creating...' : 'Create semester'}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteSubjectState && (
+        <div className="modal-backdrop" onClick={() => setDeleteSubjectState(null)}>
+          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h3 style={{ color: '#DC2626' }}>Confirm Subject Deletion</h3>
+              <button className="text-button" onClick={() => setDeleteSubjectState(null)}>Close</button>
+            </div>
+            <div className="modal-body" style={{ padding: '12px 0' }}>
+              <p>Are you sure you want to delete the following subject?</p>
+              <div style={{ backgroundColor: '#F9FAFB', padding: 12, borderRadius: 8, margin: '12px 0', border: '1px solid #E5E7EB' }}>
+                <strong>Name:</strong> {deleteSubjectState.subject.name}<br />
+                <strong>Code:</strong> {deleteSubjectState.subject.code}<br />
+                <strong>Department:</strong> {selectedDepartment?.name}<br />
+              </div>
+
+              {deleteSubjectState.loading ? (
+                <p>Checking subject dependencies...</p>
+              ) : deleteSubjectState.error ? (
+                <div className="error">{deleteSubjectState.error}</div>
+              ) : deleteSubjectState.warningInfo ? (
+                <div style={{ padding: 12, backgroundColor: deleteSubjectState.warningInfo.status === 'warning' ? '#FEF2F2' : '#EFF6FF', borderRadius: 8, border: '1px solid', borderColor: deleteSubjectState.warningInfo.status === 'warning' ? '#FEE2E2' : '#BFDBFE', margin: '12px 0' }}>
+                  <h4 style={{ color: deleteSubjectState.warningInfo.status === 'warning' ? '#991B1B' : '#1E40AF', marginTop: 0, marginBottom: 6 }}>
+                    {deleteSubjectState.warningInfo.status === 'warning' ? '⚠️ Warning: Linked Content Found' : 'ℹ️ Clean Deletion'}
+                  </h4>
+                  <p style={{ fontSize: 14, color: deleteSubjectState.warningInfo.status === 'warning' ? '#7F1D1D' : '#1E3A8A', margin: 0 }}>
+                    {deleteSubjectState.warningInfo.message}
+                  </p>
+                  {deleteSubjectState.warningInfo.status === 'warning' && (
+                    <div style={{ marginTop: 10, fontSize: 13, color: '#7F1D1D' }}>
+                      <strong>Documents to be deleted (Syllabus, PYQs, Notes):</strong>
+                      <ul style={{ paddingLeft: 20, marginTop: 4, marginBottom: 0 }}>
+                        {deleteSubjectState.warningInfo.documents.map(d => (
+                          <li key={d.id}>{d.title} ({d.type})</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+            <div className="modal-actions" style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 16 }}>
+              <button className="btn" type="button" onClick={() => setDeleteSubjectState(null)} disabled={deleteSubjectState.loading}>Cancel</button>
+              <button className="btn" type="button" onClick={handleDeleteConfirm} disabled={deleteSubjectState.loading} style={{ backgroundColor: '#DC2626', color: '#fff' }}>
+                {deleteSubjectState.loading ? 'Deleting...' : 'Yes, Delete Subject'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -648,10 +764,6 @@ export default function SubjectsPage(){
                 <label>
                   Description
                   <textarea value={formState.description} onChange={(event) => setFormState((prev) => ({ ...prev, description: event.target.value }))} rows="4" />
-                </label>
-                <label>
-                  Content / notes
-                  <textarea value={formState.content} onChange={(event) => setFormState((prev) => ({ ...prev, content: event.target.value }))} rows="6" />
                 </label>
                 <div className="modal-actions">
                   <button className="btn" type="button" onClick={closeModal}>Cancel</button>

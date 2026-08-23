@@ -10,14 +10,23 @@ const typeOptions = ['', 'syllabus', 'pyq', 'academic_calendar', 'note', 'other'
 export default function DocumentsPage(){
   const [docs, setDocs] = useState([])
   const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState('')
-  const [typeFilter, setTypeFilter] = useState('')
-  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState(() => sessionStorage.getItem('doc_filter_status') || '')
+  const [typeFilter, setTypeFilter] = useState(() => sessionStorage.getItem('doc_filter_type') || '')
+  const [search, setSearch] = useState(() => sessionStorage.getItem('doc_filter_search') || '')
   const [departments, setDepartments] = useState([])
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState('')
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState(() => sessionStorage.getItem('doc_filter_dept') || '')
   const [semesters, setSemesters] = useState([])
-  const [selectedSemesterId, setSelectedSemesterId] = useState('')
-  const [pageSize, setPageSize] = useState('25')
+  const [selectedSemesterId, setSelectedSemesterId] = useState(() => sessionStorage.getItem('doc_filter_sem') || '')
+  const [pageSize, setPageSize] = useState(() => sessionStorage.getItem('doc_filter_pagesize') || '25')
+
+  useEffect(() => {
+    sessionStorage.setItem('doc_filter_status', statusFilter)
+    sessionStorage.setItem('doc_filter_type', typeFilter)
+    sessionStorage.setItem('doc_filter_search', search)
+    sessionStorage.setItem('doc_filter_dept', selectedDepartmentId)
+    sessionStorage.setItem('doc_filter_sem', selectedSemesterId)
+    sessionStorage.setItem('doc_filter_pagesize', pageSize)
+  }, [statusFilter, typeFilter, search, selectedDepartmentId, selectedSemesterId, pageSize])
 
   useEffect(()=>{
     async function load(){

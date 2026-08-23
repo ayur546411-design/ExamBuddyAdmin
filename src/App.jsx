@@ -9,6 +9,8 @@ import ProcessingPage from './pages/processing/ProcessingPage'
 import ErrorsPage from './pages/errors/ErrorsPage'
 import AuditPage from './pages/audit/AuditPage'
 import SubjectsPage from './pages/subjects/SubjectsPage'
+import SubjectDetailPage from './pages/subjects/SubjectDetailPage'
+import PyqsPage from './pages/documents/PyqsPage'
 import UsersPage from './pages/users/UsersPage'
 import SettingsPage from './pages/settings/SettingsPage'
 import MainLayout from './layouts/MainLayout'
@@ -42,6 +44,8 @@ export default function App(){
           <Route path="/errors" element={<ErrorsPage />} />
           <Route path="/audit" element={<AuditPage />} />
           <Route path="/subjects" element={<SubjectsPage />} />
+          <Route path="/subjects/:id" element={<SubjectDetailPage />} />
+          <Route path="/pyqs" element={<PyqsPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>

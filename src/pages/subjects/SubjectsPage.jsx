@@ -15,7 +15,11 @@ export default function SubjectsPage(){
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [deleteSubjectState, setDeleteSubjectState] = useState(null)
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState([])
+  const [copyState, setCopyState] = useState(null)
+  const [copyDestinations, setCopyDestinations] = useState([])
 
   async function loadData(){
     setLoading(true)
@@ -152,6 +156,69 @@ export default function SubjectsPage(){
     setFormState({ name: '', code: '', description: '', content: '' })
     setShiftTargetId('')
     setPdfFile(null)
+  }
+
+  function getSubjectsByIds(ids){
+    return departments.flatMap((department) => department.semesters.flatMap((semester) => semester.subjects)).filter((subject) => ids.includes(subject.id))
+  }
+
+  async function openCopyModal(subjects){
+    const sourceSubjects = Array.isArray(subjects) ? subjects : [subjects]
+    setSaving(true)
+    setError('')
+    setSuccess('')
+    try {
+      const destinationRows = await Promise.all(departments.map(async (department) => {
+        const response = await api.get('/semesters/', { params: { department_id: department.id } })
+        const semesters = (response.data || []).map((semester) => ({
+          id: semester.id,
+          name: `Semester ${semester.semester_number}`,
+          semester_number: semester.semester_number
+        }))
+        return { department, semesters, semesterId: semesters[0]?.id || '' }
+      }))
+      setCopyDestinations(destinationRows)
+      setCopyState({ sourceIds: sourceSubjects.map((subject) => subject.id), sourceSubjects })
+    } catch (err) {
+      setError(err?.response?.data?.detail || 'Failed to load destination semesters.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function closeCopyModal(){
+    setCopyState(null)
+    setCopyDestinations([])
+  }
+
+  async function handleCopySubjects(event){
+    event.preventDefault()
+    const destinations = copyDestinations.filter((destination) => destination.selected && destination.semesterId).map((destination) => ({
+      department_id: destination.department.id,
+      semester_id: destination.semesterId
+    }))
+    if (!destinations.length) {
+      setError('Select at least one destination department and semester.')
+      return
+    }
+
+    setSaving(true)
+    setError('')
+    setSuccess('')
+    try {
+      const response = await api.post('/subjects/bulk-copy', {
+        source_subject_ids: copyState.sourceIds,
+        destinations
+      })
+      await loadDepartmentData(selectedDepartmentId)
+      setSelectedSubjectIds([])
+      closeCopyModal()
+      setSuccess(`Copied ${response.data?.length || 0} subject${response.data?.length === 1 ? '' : 's'} successfully.`)
+    } catch (err) {
+      setError(err?.response?.data?.detail || 'No subjects were copied. Resolve the destination conflict and try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   function openAddModal(){
@@ -465,6 +532,7 @@ export default function SubjectsPage(){
       </div>
 
       {error ? <div className="error" style={{ marginBottom: 12 }}>{error}</div> : null}
+      {success ? <div className="success" style={{ marginBottom: 12, color: '#166534' }}>{success}</div> : null}
 
       <div className="stats-grid">
         <div className="stat-card">
@@ -529,6 +597,7 @@ export default function SubjectsPage(){
               <p>{selectedSemesterId ? `Viewing ${selectedSemester?.name}` : 'Viewing all semesters'}</p>
             </div>
             <div className="inline-controls">
+              {selectedSubjectIds.length > 0 ? <button className="btn primary" type="button" onClick={() => openCopyModal(getSubjectsByIds(selectedSubjectIds))}>Copy selected ({selectedSubjectIds.length})</button> : null}
               <label>
                 Department
                 <select value={selectedDepartmentId} onChange={(event) => setSelectedDepartmentId(event.target.value)}>
@@ -571,6 +640,9 @@ export default function SubjectsPage(){
                       {semester.subjects.map((subject) => (
                         <article key={subject.id} className="subject-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                           <div className="subject-card-header">
+                            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                              <input type="checkbox" checked={selectedSubjectIds.includes(subject.id)} onChange={() => setSelectedSubjectIds((current) => current.includes(subject.id) ? current.filter((id) => id !== subject.id) : [...current, subject.id])} />
+                              <span>
                             <div>
                               <h4>
                                 <Link to={`/subjects/${subject.id}`} style={{ color: '#2563EB', textDecoration: 'none' }} className="subject-link-title">
@@ -580,6 +652,8 @@ export default function SubjectsPage(){
                               <p>{subject.description || 'No description provided.'}</p>
                             </div>
                             <div className="subject-code">{subject.code}</div>
+                              </span>
+                            </label>
                           </div>
                           <div className="subject-card-body" style={{ marginTop: 12 }}>
                             <div className="subject-meta">
@@ -589,6 +663,7 @@ export default function SubjectsPage(){
                           <div className="subject-actions" style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                             <button className="text-button" type="button" onClick={() => openEditModal(subject)}>Edit</button>
                             <button className="text-button" type="button" onClick={() => openShiftModal(subject)}>Shift</button>
+                            <button className="text-button" type="button" onClick={() => openCopyModal(subject)}>Copy</button>
                             <button className="text-button" type="button" onClick={() => openDeleteModal(subject)} style={{ color: '#DC2626' }}>Delete</button>
                           </div>
                         </article>
@@ -687,6 +762,38 @@ export default function SubjectsPage(){
                 {deleteSubjectState.loading ? 'Deleting...' : 'Yes, Delete Subject'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {copyState && (
+        <div className="modal-backdrop" onClick={closeCopyModal}>
+          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Copy subject{copyState.sourceSubjects.length > 1 ? 's' : ''}</h3>
+              <button className="text-button" type="button" onClick={closeCopyModal}>Close</button>
+            </div>
+            <form className="modal-form" onSubmit={handleCopySubjects}>
+              <div className="copy-source-list">
+                {copyState.sourceSubjects.map((subject) => <div key={subject.id}><strong>{subject.name}</strong> <span className="subject-code">{subject.code}</span></div>)}
+              </div>
+              <fieldset className="copy-destination-list">
+                <legend>Copy to department(s)</legend>
+                {copyDestinations.map((destination, index) => (
+                  <label key={destination.department.id} className="copy-destination-row">
+                    <span><input type="checkbox" checked={Boolean(destination.selected)} onChange={(event) => setCopyDestinations((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, selected: event.target.checked } : item))} /> {destination.department.name}</span>
+                    <select value={destination.semesterId} disabled={!destination.selected} onChange={(event) => setCopyDestinations((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, semesterId: event.target.value } : item))}>
+                      {destination.semesters.map((semester) => <option key={semester.id} value={semester.id}>{semester.name}</option>)}
+                    </select>
+                  </label>
+                ))}
+              </fieldset>
+              <p className="modal-hint">Only subject metadata is copied. Existing syllabus, PYQ, and note documents stay with the original subject.</p>
+              <div className="modal-actions">
+                <button className="btn" type="button" onClick={closeCopyModal}>Cancel</button>
+                <button className="btn primary" type="submit" disabled={saving}>{saving ? 'Copying...' : 'Copy subject'}</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -9,7 +9,9 @@ import ProcessingPage from './pages/processing/ProcessingPage'
 import ErrorsPage from './pages/errors/ErrorsPage'
 import AuditPage from './pages/audit/AuditPage'
 import SubjectsPage from './pages/subjects/SubjectsPage'
-import SubjectDetailPage from './pages/subjects/SubjectDetailPage'
+import DepartmentListPage from './pages/subjects/DepartmentListPage'
+import DepartmentWorkspacePage from './pages/subjects/DepartmentWorkspacePage'
+import SubjectEditorPage from './pages/subjects/SubjectEditorPage'
 import PyqsPage from './pages/documents/PyqsPage'
 import UsersPage from './pages/users/UsersPage'
 import SettingsPage from './pages/settings/SettingsPage'
@@ -43,8 +45,11 @@ export default function App(){
           <Route path="/processing" element={<ProcessingPage />} />
           <Route path="/errors" element={<ErrorsPage />} />
           <Route path="/audit" element={<AuditPage />} />
-          <Route path="/subjects" element={<SubjectsPage />} />
+          <Route path="/subjects" element={<DepartmentListPage />} />
+          <Route path="/subjects/departments/:departmentId" element={<DepartmentWorkspacePage />} />
+          <Route path="/subjects/editor/:id" element={<SubjectEditorPage />} />
           <Route path="/subjects/:id" element={<SubjectDetailPage />} />
+          <Route path="/subjects/legacy" element={<SubjectsPage />} />
           <Route path="/pyqs" element={<PyqsPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/settings" element={<SettingsPage />} />

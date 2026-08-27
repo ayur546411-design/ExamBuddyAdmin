@@ -169,15 +169,27 @@ export default function SubjectsPage(){
     setError('')
     setSuccess('')
     try {
-      const destinationRows = await Promise.all(departments.filter((department) => !sourceDepartmentIds.has(department.id)).map(async (department) => {
-        const response = await api.get('/semesters/', { params: { department_id: department.id } })
-        const semesters = (response.data || []).map((semester) => ({
+      const response = await api.get('/semesters/')
+      const semestersByDepartment = new Map()
+      ;(response.data || []).forEach((semester) => {
+        const semesters = semestersByDepartment.get(semester.department_id) || []
+        semesters.push({
           id: semester.id,
           name: `Semester ${semester.semester_number}`,
           semester_number: semester.semester_number
-        }))
-        return { department, semesters, semesterId: semesters[0]?.id || '' }
-      }))
+        })
+        semestersByDepartment.set(semester.department_id, semesters)
+      })
+      const destinationRows = departments
+        .filter((department) => !sourceDepartmentIds.has(department.id))
+        .map((department) => {
+          const departmentSemesters = semestersByDepartment.get(department.id) || []
+          return { department, semesters: departmentSemesters, semesterId: departmentSemesters[0]?.id || '' }
+        })
+        .filter((destination) => destination.semesters.length > 0)
+      if (!destinationRows.length) {
+        throw new Error('No destination departments with active semesters were found.')
+      }
       setCopyDestinations(destinationRows)
       setCopyState({ sourceIds: sourceSubjects.map((subject) => subject.id), sourceSubjects })
     } catch (err) {

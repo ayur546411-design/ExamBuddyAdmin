@@ -46,7 +46,7 @@ export default function App(){
           <Route path="/processing" element={<ProcessingPage />} />
           <Route path="/errors" element={<ErrorsPage />} />
           <Route path="/audit" element={<AuditPage />} />
-          <Route path="/subjects" element={<DepartmentListPage />} />
+          <Route path="/subjects" element={<SubjectsPage />} />
           <Route path="/subjects/departments/:departmentId" element={<DepartmentWorkspacePage />} />
           <Route path="/subjects/editor/:id" element={<SubjectEditorPage />} />
           <Route path="/subjects/:id" element={<SubjectDetailPage />} />

@@ -164,11 +164,12 @@ export default function SubjectsPage(){
 
   async function openCopyModal(subjects){
     const sourceSubjects = Array.isArray(subjects) ? subjects : [subjects]
+    const sourceDepartmentIds = new Set(sourceSubjects.map((subject) => subject.department_id))
     setSaving(true)
     setError('')
     setSuccess('')
     try {
-      const destinationRows = await Promise.all(departments.map(async (department) => {
+      const destinationRows = await Promise.all(departments.filter((department) => !sourceDepartmentIds.has(department.id)).map(async (department) => {
         const response = await api.get('/semesters/', { params: { department_id: department.id } })
         const semesters = (response.data || []).map((semester) => ({
           id: semester.id,

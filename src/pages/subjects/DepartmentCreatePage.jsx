@@ -7,10 +7,12 @@ const initialForm = { school_id: '', name: '', code: '', description: '', durati
 export default function DepartmentCreatePage(){
   const navigate = useNavigate()
   const [schools, setSchools] = useState([])
+  const [departments, setDepartments] = useState([])
   const [form, setForm] = useState(initialForm)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [warning, setWarning] = useState('')
 
   useEffect(() => {
     async function loadSchools(){
@@ -19,6 +21,29 @@ export default function DepartmentCreatePage(){
         const schoolList = response.data || []
         setSchools(schoolList)
         if (schoolList.length) setForm((current) => ({ ...current, school_id: schoolList[0].id }))
+
+        const departmentResults = await Promise.allSettled(schoolList.map(async (school) => {
+          const departmentResponse = await api.get(`/schools/${school.id}/departments`)
+          return (departmentResponse.data || []).map((department) => ({ ...department, school, semesters: [], subjects: [] }))
+        }))
+        const departmentRows = departmentResults
+          .filter((result) => result.status === 'fulfilled')
+          .flatMap((result) => result.value)
+        setDepartments(departmentRows)
+
+        const failedDepartmentLoads = departmentResults.some((result) => result.status === 'rejected')
+        if (failedDepartmentLoads) setWarning('Some departments could not be loaded. Refresh to try again.')
+
+        const counts = await Promise.allSettled(departmentRows.map(async (department) => {
+          const [semesterResponse, subjectResponse] = await Promise.all([
+            api.get('/semesters/', { params: { department_id: department.id }, skipAuthRedirect: true }),
+            api.get('/subjects/', { params: { department_id: department.id }, skipAuthRedirect: true })
+          ])
+          return { id: department.id, semesters: semesterResponse.data || [], subjects: subjectResponse.data || [] }
+        }))
+        const countById = new Map(counts.filter((result) => result.status === 'fulfilled').map((result) => [result.value.id, result.value]))
+        setDepartments((current) => current.map((department) => ({ ...department, ...(countById.get(department.id) || {}) })))
+        if (counts.some((result) => result.status === 'rejected')) setWarning('Department content counts need an authenticated session. You can still select a department or create one.')
       } catch (err) {
         setError(err?.response?.data?.detail || 'Failed to load schools.')
       } finally { setLoading(false) }
@@ -62,7 +87,16 @@ export default function DepartmentCreatePage(){
       <span className="pill accent">Admin action</span>
     </div>
     {error && <div className="error" role="alert">{error}</div>}
-    {loading ? <div className="card">Loading schools...</div> : <form className="card department-form" onSubmit={saveDepartment}>
+    {warning && <div className="warning" role="status">{warning}</div>}
+    {loading ? <div className="card">Loading schools and departments...</div> : <>
+    <section className="existing-departments">
+      <div className="section-header"><div><h2>Existing departments</h2><p>Open a department to review or manage its academic content.</p></div><span className="pill">{departments.length} available</span></div>
+      {departments.length ? <div className="existing-department-list">{departments.map((department) => <article className="existing-department" key={department.id}>
+        <div><span className="eyebrow">{department.school?.name || 'School'}</span><h3>{department.name}</h3><p>{department.code} · {department.semesters.length} semesters · {department.subjects.length} subjects</p></div>
+        <div className="actions-cell"><Link className="btn" to={`/subjects/departments/${department.id}`}>Open workspace</Link><Link className="btn primary" to={`/subjects?department=${department.id}`}>Manage content</Link></div>
+      </article>)}</div> : <div className="empty-state">No departments yet. Create the first one below.</div>}
+    </section>
+    <form className="card department-form" onSubmit={saveDepartment}>
       <div className="form-section-heading"><div><h2>Department details</h2><p>These details will appear throughout the admin dashboard and mobile app.</p></div></div>
       <div className="form-grid">
         <label>School<select value={form.school_id} onChange={(event) => updateField('school_id', event.target.value)} disabled={!schools.length} required><option value="">Select a school</option>{schools.map((school) => <option key={school.id} value={school.id}>{school.name}</option>)}</select></label>
@@ -74,6 +108,6 @@ export default function DepartmentCreatePage(){
       <label className="full-width-field">Description<textarea rows="5" value={form.description} onChange={(event) => updateField('description', event.target.value)} placeholder="What does this department cover?" /></label>
       {!schools.length && <div className="empty-state">No active schools are available. Add a school before creating a department.</div>}
       <div className="modal-actions"><Link className="btn" to="/subjects">Cancel</Link><button className="btn primary" disabled={saving || !schools.length}>{saving ? 'Creating...' : 'Create Department'}</button></div>
-    </form>}
+    </form></>}
   </div>
 }

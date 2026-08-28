@@ -27,7 +27,7 @@ export function AuthProvider({ children }){
       (response) => response,
       (error) => {
         const status = error?.response?.status
-        if (status === 401 || status === 403) {
+        if ((status === 401 || status === 403) && !error?.config?.skipAuthRedirect) {
           logout()
           window.location.replace('/login')
         }

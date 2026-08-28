@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import api from '../../api/client'
 
 export default function SubjectsPage(){
+  const [searchParams] = useSearchParams()
   const [departments, setDepartments] = useState([])
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState(() => sessionStorage.getItem('subj_filter_dept') || '')
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState(() => searchParams.get('department') || sessionStorage.getItem('subj_filter_dept') || '')
   const [selectedSemesterId, setSelectedSemesterId] = useState(() => sessionStorage.getItem('subj_filter_sem') || '')
   const [modalState, setModalState] = useState(null)
   const [semesterModalOpen, setSemesterModalOpen] = useState(false)

@@ -114,8 +114,11 @@ export default function DepartmentWorkspacePage(){
       const documentId = syllabusDocument?.id || syllabusDocument?.document_id
       if (documentId) {
         await api.put(`/documents/${documentId}`, { structured_json: syllabus, status: syllabusStatus })
+      } else if (units.length || syllabusStatus !== 'draft') {
+        const createdDocument = await api.post('/documents/workspace-syllabus', { subject_id: subject.id, structured_json: { ...syllabus, 'Subject Name': subjectForm.name, 'Subject Code': subjectForm.code }, status: syllabusStatus })
+        setSyllabusDocument(createdDocument.data)
       }
-      setSuccess(documentId ? 'All changes saved. Updates are now visible in the student app.' : 'Subject details saved. Upload a syllabus to save syllabus content and status.')
+      setSuccess('All changes saved. Updates are now visible in the student app.')
     } catch (err) {
       setError(err?.response?.data?.detail || err?.message || 'Failed to save subject changes.')
     } finally { setEditorSaving(false) }

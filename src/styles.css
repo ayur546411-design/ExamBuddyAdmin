@@ -179,6 +179,8 @@ button, input, select, textarea{ font:inherit }
 .semester-nav-item.active{ background:#eef2ff; color:#4338ca; font-weight:700 }
 .semester-nav-item.active small{ color:#6366f1 }
 .workspace-add-semester{ width:100%; padding:8px 10px; font-size:.68rem }
+.workspace-status-field{ display:grid; gap:5px; margin-top:5px; color:#64748b; font-size:.68rem }
+.workspace-status-field select{ width:100%; padding:8px; border:1px solid #dbeafe; border-radius:6px; background:#fff; color:#334155; font-size:.68rem }
 .academic-main{ min-width:0; padding:16px }
 .content-header{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:13px; border-bottom:1px solid #edf0f6 }
 .content-header h2{ margin:3px 0; font-size:1.05rem }

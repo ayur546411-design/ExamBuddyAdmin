@@ -11,6 +11,7 @@ import AuditPage from './pages/audit/AuditPage'
 import SubjectsPage from './pages/subjects/SubjectsPage'
 import DepartmentListPage from './pages/subjects/DepartmentListPage'
 import DepartmentWorkspacePage from './pages/subjects/DepartmentWorkspacePage'
+import DepartmentCreatePage from './pages/subjects/DepartmentCreatePage'
 import SubjectEditorPage from './pages/subjects/SubjectEditorPage'
 import SubjectDetailPage from './pages/subjects/SubjectDetailPage'
 import PyqsPage from './pages/documents/PyqsPage'
@@ -47,6 +48,7 @@ export default function App(){
           <Route path="/errors" element={<ErrorsPage />} />
           <Route path="/audit" element={<AuditPage />} />
           <Route path="/subjects" element={<SubjectsPage />} />
+          <Route path="/subjects/departments/new" element={<DepartmentCreatePage />} />
           <Route path="/subjects/departments/:departmentId" element={<DepartmentWorkspacePage />} />
           <Route path="/subjects/editor/:id" element={<SubjectEditorPage />} />
           <Route path="/subjects/:id" element={<SubjectDetailPage />} />

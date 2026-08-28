@@ -33,7 +33,7 @@ export default function DepartmentListPage(){
   return <div className="page">
     <div className="page-heading">
       <div><h1>Departments</h1><p>Choose a department to inspect its complete academic structure.</p></div>
-      <span className="pill accent">Live backend data</span>
+      <Link className="btn primary" to="/subjects/departments/new">+ Name Department</Link>
     </div>
     {error && <div className="error">{error}</div>}
     {loading ? <div className="card">Loading departments...</div> : <div className="department-grid">

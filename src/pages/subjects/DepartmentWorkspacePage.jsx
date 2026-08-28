@@ -82,7 +82,13 @@ export default function DepartmentWorkspacePage(){
         setSubjectForm({ name: nextSubject.name || '', code: nextSubject.code || '', credits: nextSubject.credits || 0, description: nextSubject.description || '' })
         setSyllabusDocument((documentResponse.data || []).find((document) => document.document_type === 'syllabus') || null)
       } catch (err) {
-        setError(err?.response?.data?.detail === 'Document not found' ? 'No syllabus has been uploaded for this subject yet.' : err?.response?.data?.detail || 'Failed to load subject content.')
+        const detail = err?.response?.data?.detail
+        if (detail === 'Document not found' || err?.response?.status === 404) {
+          setSyllabusDocument(null)
+          setError('')
+          return
+        }
+        setError(detail || 'Failed to load subject content.')
       }
     }
     loadSubject()

@@ -108,15 +108,17 @@ export default function DepartmentWorkspacePage(){
   async function saveEditor(){
     setEditorSaving(true); setError(''); setSuccess('')
     try {
-      if (subject) { const response = await api.put(`/subjects/${subject.id}`, { ...subjectForm, credits: Number(subjectForm.credits) }); setSubject(response.data) }
+      if (!subject?.id) throw new Error('Select a subject before saving changes.')
+      const response = await api.put(`/subjects/${subject.id}`, { ...subjectForm, credits: Number(subjectForm.credits) })
+      setSubject(response.data)
       const documentId = syllabusDocument?.id || syllabusDocument?.document_id
       if (documentId) {
         await api.put(`/documents/${documentId}`, { structured_json: syllabus, status: syllabusStatus })
-      } else if (syllabusDocument || syllabusStatus !== 'draft') {
-        throw new Error('This subject has no saved syllabus document. Upload a syllabus before changing its status.')
       }
-      setSuccess('All changes saved. Updates are now visible in the student app.')
-    } catch (err) { setError(err?.response?.data?.detail || 'Failed to save subject changes.') } finally { setEditorSaving(false) }
+      setSuccess(documentId ? 'All changes saved. Updates are now visible in the student app.' : 'Subject details saved. Upload a syllabus to save syllabus content and status.')
+    } catch (err) {
+      setError(err?.response?.data?.detail || err?.message || 'Failed to save subject changes.')
+    } finally { setEditorSaving(false) }
   }
   async function openCopy(){
     try {

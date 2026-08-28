@@ -170,6 +170,7 @@ export default function UploadPage(){
     }
 
     if(!form.school_id || !form.department_id){ setError('Please select school and department'); return }
+    if(form.document_type === 'syllabus' && !form.subject_id){ setError('Select the subject this syllabus belongs to'); return }
 
     const fd = new FormData()
     if(file){ fd.append('file', file) }

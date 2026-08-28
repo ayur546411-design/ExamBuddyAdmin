@@ -69,10 +69,13 @@ export default function DepartmentWorkspacePage(){
     async function loadSubject(){
       if (!selectedSubjectId) return
       try {
-        const [subjectResponse, documentResponse] = await Promise.all([
-          api.get(`/subjects/${selectedSubjectId}`),
-          api.get('/documents', { params: { subject_id: selectedSubjectId, page_size: 0 } })
-        ])
+        const subjectResponse = await api.get(`/subjects/${selectedSubjectId}`)
+        let documentResponse = { data: [] }
+        try {
+          documentResponse = await api.get('/documents', { params: { subject_id: selectedSubjectId, document_type: 'syllabus', page_size: 0 } })
+        } catch (documentError) {
+          if (documentError?.response?.status !== 404) throw documentError
+        }
         const nextSubject = subjectResponse.data
         setSubject(nextSubject)
         setSubjectForm({ name: nextSubject.name || '', code: nextSubject.code || '', credits: nextSubject.credits || 0, description: nextSubject.description || '' })

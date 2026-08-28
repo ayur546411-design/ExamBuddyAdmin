@@ -68,11 +68,12 @@ export default function DepartmentWorkspacePage(){
   useEffect(() => {
     async function loadSubject(){
       if (!selectedSubjectId) return
+      setError('')
       try {
         const subjectResponse = await api.get(`/subjects/${selectedSubjectId}`)
         let documentResponse = { data: [] }
         try {
-          documentResponse = await api.get('/documents', { params: { subject_id: selectedSubjectId, document_type: 'syllabus', page_size: 0 } })
+          documentResponse = await api.get('/documents/', { params: { subject_id: selectedSubjectId, document_type: 'syllabus', page_size: 0 } })
         } catch (documentError) {
           if (documentError?.response?.status !== 404) throw documentError
         }
@@ -80,7 +81,9 @@ export default function DepartmentWorkspacePage(){
         setSubject(nextSubject)
         setSubjectForm({ name: nextSubject.name || '', code: nextSubject.code || '', credits: nextSubject.credits || 0, description: nextSubject.description || '' })
         setSyllabusDocument((documentResponse.data || []).find((document) => document.document_type === 'syllabus') || null)
-      } catch (err) { setError(err?.response?.data?.detail || 'Failed to load subject content.') }
+      } catch (err) {
+        setError(err?.response?.data?.detail === 'Document not found' ? 'No syllabus has been uploaded for this subject yet.' : err?.response?.data?.detail || 'Failed to load subject content.')
+      }
     }
     loadSubject()
   }, [selectedSubjectId])

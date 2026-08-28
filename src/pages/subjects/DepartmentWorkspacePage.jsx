@@ -170,8 +170,9 @@ export default function DepartmentWorkspacePage(){
       const remaining = semesters.filter((item) => item.id !== semester.id)
       setSemesters(remaining); setSelectedSubjectId(''); setSuccess(`Semester ${semester.semester_number} deleted successfully.`)
     } catch (err) {
+      const status = err?.response?.status
       const detail = err?.response?.data?.detail
-      setError(err?.response?.status === 404 ? 'Semester deletion is not available on the deployed backend yet. Deploy the latest backend before trying again.' : detail || 'Failed to delete semester.')
+      setError(status === 401 || status === 403 ? 'You are not authorized to delete semesters. Sign in again with an admin account.' : detail || 'Failed to delete semester.')
     }
     finally { setEditorSaving(false) }
   }

@@ -310,8 +310,8 @@ export default function DocumentDetailPage(){
   }
 
   if(loading) return <div className="page"><p>Loading document...</p></div>
-  if(error) return <div className="page"><p>Error loading document: {error}</p></div>
-  if(!doc) return <div className="page"><p>Document not found.</p></div>
+  if(error) return <div className="page"><div className="card"><h2>Unable to open this document</h2><p>{error === 'Document not found' ? 'This document may have been removed or the upload did not save a document.' : error}</p><div className="modal-actions"><button className="btn" type="button" onClick={() => navigate('/documents')}>Back to documents</button><button className="btn primary" type="button" onClick={() => navigate('/documents/upload')}>Upload syllabus</button></div></div></div>
+  if(!doc) return <div className="page"><div className="card"><h2>No document available</h2><p>Upload a syllabus and select its subject to create a document.</p><div className="modal-actions"><button className="btn primary" type="button" onClick={() => navigate('/documents/upload')}>Upload syllabus</button></div></div></div>
 
   return (
     <div className="page">

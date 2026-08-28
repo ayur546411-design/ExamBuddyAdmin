@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { uploadDocument } from '../../api/documentsApi'
 import api from '../../api/client'
 
@@ -18,6 +19,7 @@ const examTypes = [
 ]
 
 export default function UploadPage(){
+  const navigate = useNavigate()
   const [schools, setSchools] = useState([])
   const [departments, setDepartments] = useState([])
   const [semesters, setSemesters] = useState([])
@@ -193,7 +195,12 @@ export default function UploadPage(){
       const res = await uploadDocument(fd, (evt)=>{
         if(evt.total) setProgress(Math.round((evt.loaded / evt.total) * 100))
       })
-      alert('Upload completed successfully')
+      const savedDocumentId = res.data?.document_ids?.[0]
+      if(savedDocumentId){
+        navigate(`/documents/${savedDocumentId}`)
+      } else {
+        alert('Upload completed, but no document was saved. Check the selected subject and PDF.')
+      }
       setFile(null)
       setProgress(0)
     }catch(err){

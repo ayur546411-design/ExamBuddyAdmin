@@ -81,8 +81,10 @@ export default function DepartmentWorkspacePage(){
         const nextSubject = subjectResponse.data
         setSubject(nextSubject)
         setSubjectForm({ name: nextSubject.name || '', code: nextSubject.code || '', credits: nextSubject.credits || 0, description: nextSubject.description || '' })
-        setSyllabusDocument((documentResponse.data || []).find((document) => document.document_type === 'syllabus') || null)
-        setSyllabusStatus((documentResponse.data || []).find((document) => document.document_type === 'syllabus')?.status || 'draft')
+        const documents = Array.isArray(documentResponse.data) ? documentResponse.data : []
+        const loadedSyllabus = documents.find((document) => document.document_type === 'syllabus' && (document.id || document.document_id)) || null
+        setSyllabusDocument(loadedSyllabus)
+        setSyllabusStatus(loadedSyllabus?.status || 'draft')
       } catch (err) {
         const detail = err?.response?.data?.detail
         if (detail === 'Document not found' || err?.response?.status === 404) {
@@ -107,7 +109,12 @@ export default function DepartmentWorkspacePage(){
     setEditorSaving(true); setError(''); setSuccess('')
     try {
       if (subject) { const response = await api.put(`/subjects/${subject.id}`, { ...subjectForm, credits: Number(subjectForm.credits) }); setSubject(response.data) }
-      if (syllabusDocument) await api.put(`/documents/${syllabusDocument.id}`, { structured_json: syllabus, status: syllabusStatus })
+      const documentId = syllabusDocument?.id || syllabusDocument?.document_id
+      if (documentId) {
+        await api.put(`/documents/${documentId}`, { structured_json: syllabus, status: syllabusStatus })
+      } else if (syllabusDocument || syllabusStatus !== 'draft') {
+        throw new Error('This subject has no saved syllabus document. Upload a syllabus before changing its status.')
+      }
       setSuccess('All changes saved. Updates are now visible in the student app.')
     } catch (err) { setError(err?.response?.data?.detail || 'Failed to save subject changes.') } finally { setEditorSaving(false) }
   }

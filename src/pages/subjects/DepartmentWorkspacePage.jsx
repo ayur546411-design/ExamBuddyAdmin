@@ -207,9 +207,20 @@ export default function DepartmentWorkspacePage(){
 
   async function applyAiSyllabus(){
     if (!subject?.id) return
-    setSyllabusDocument((current) => ({ ...current, structured_json: aiExtractedSyllabus, status: syllabusStatus }))
-    setAiExtractorOpen(false)
-    setSuccess('Extracted syllabus loaded into the editor. Save changes to persist it.')
+    setEditorSaving(true); setError(''); setSuccess('')
+    try {
+      const documentId = syllabusDocument?.id || syllabusDocument?.document_id
+      const payload = { structured_json: aiExtractedSyllabus, status: syllabusStatus === 'draft' ? 'active' : syllabusStatus }
+      const response = documentId
+        ? await api.put(`/documents/${documentId}`, payload)
+        : await api.post('/documents/workspace-syllabus', { subject_id: subject.id, ...payload })
+      setSyllabusDocument(response.data)
+      setSyllabusStatus(payload.status)
+      setAiExtractorOpen(false)
+      setSuccess('Extracted syllabus saved successfully and is now visible in the workspace.')
+    } catch (err) {
+      setError(err?.response?.data?.detail || 'Failed to save the extracted syllabus.')
+    } finally { setEditorSaving(false) }
   }
 
   async function handleAiBulkCreate(){

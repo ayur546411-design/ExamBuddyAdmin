@@ -83,33 +83,40 @@ export default function LoginPage(){
   }
 
   return (
-    <div className="center-screen">
-      <form className="card" onSubmit={handleSubmit} style={{ minWidth:360 }}>
-        <h2>ExamBuddy Admin Login</h2>
-        {error && <div className="error">{error}</div>}
+    <div className="login-screen">
+      <div className="login-shell">
+        <section className="login-brand-panel">
+          <div className="brand-dots" aria-hidden="true" />
+          <img className="login-logo" src="/logo.png" alt="ExamBuddy" />
+          <div className="brand-welcome">
+            <div className="brand-shield" aria-hidden="true">✓</div>
+            <strong>Welcome Admin!</strong>
+            <span>Please sign in to access<br />your dashboard</span>
+          </div>
+          <div className="brand-ring brand-ring-one" aria-hidden="true" />
+          <div className="brand-ring brand-ring-two" aria-hidden="true" />
+        </section>
 
-        <label>Full name</label>
-        <input value={form.full_name} onChange={e=>setForm({...form, full_name: e.target.value})} />
+        <form className="login-form-panel" onSubmit={handleSubmit}>
+          <div className="secure-label"><span aria-hidden="true">♢</span> Secure Admin Access</div>
+          <div className="login-heading">
+            <span className="eyebrow">ExamBuddy workspace</span>
+            <h1>Admin Login</h1>
+            <p>Sign in to manage your academic content</p>
+          </div>
+          {error && <div className="error login-error">{error}</div>}
 
-        <label>School</label>
-        <select value={form.school_id} onChange={e=>handleSchoolChange(e.target.value)}>
-          <option value="">Select a school</option>
-          {schools.map(s=> <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
+          <label className="login-field"><span>Full Name</span><div className="input-wrap"><span className="field-icon" aria-hidden="true">♙</span><input value={form.full_name} onChange={e=>setForm({...form, full_name: e.target.value})} placeholder="Enter your full name" required /></div></label>
+          <label className="login-field"><span>School</span><div className="input-wrap"><span className="field-icon" aria-hidden="true">⌂</span><select value={form.school_id} onChange={e=>handleSchoolChange(e.target.value)} required><option value="">Select a school</option>{schools.map(s=> <option key={s.id} value={s.id}>{s.name}</option>)}</select></div></label>
+          <label className="login-field"><span>Department</span><div className="input-wrap"><span className="field-icon" aria-hidden="true">♧</span><select value={form.department_id} onChange={e=>setForm({...form, department_id: e.target.value})} required><option value="">Select a department</option>{departments.map(d=> <option key={d.id} value={d.id}>{d.name}</option>)}</select></div></label>
 
-        <label>Department</label>
-        <select value={form.department_id} onChange={e=>setForm({...form, department_id: e.target.value})}>
-          <option value="">Select a department</option>
-          {departments.map(d=> <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select>
-
-        <div style={{ marginTop: 12 }}>
-          <button className="btn primary" disabled={loading}>{loading ? 'Signing in...' : 'Sign in as Admin (dev)'}</button>
-        </div>
-        <div style={{ marginTop:8, color:'#6b7280', fontSize:13 }}>
-          Note: This uses the backend `onboard` endpoint for quick dev login. For production implement a proper `/auth/login`.
-        </div>
-      </form>
+          <div className="login-options"><label className="remember-option"><input type="checkbox" defaultChecked /> <span>Remember me</span></label><button className="text-button" type="button" onClick={() => setError('Please contact your administrator for access help.')}>Forgot access?</button></div>
+          <button className="login-submit" disabled={loading}>{loading ? 'Signing in...' : <><span>Sign in as Admin</span><b aria-hidden="true">→</b></>}</button>
+          <div className="login-divider"><span>or</span></div>
+          <button className="secure-key-button" type="button" onClick={() => setError('Secure key sign-in is not configured yet.')}>♢ <span>Sign in with Secure Key</span></button>
+          <p className="login-note">This uses the backend <code>onboard</code> endpoint for quick dev login. For production, implement a proper <code>/auth/login</code>.</p>
+        </form>
+      </div>
     </div>
   )
 }

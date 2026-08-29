@@ -62,17 +62,51 @@ export default function DepartmentWorkspacePage(){
 
   useEffect(() => {
     async function load(){
+      if (!departmentId) {
+        setDepartment(null)
+        setSemesters([])
+        setError('Department not found.')
+        return
+      }
+
       try {
         const schools = (await api.get('/schools/')).data || []
         let found = null
+
         for (const school of schools) {
-          const rows = (await api.get(`/schools/${school.id}/departments`)).data || []
-          const match = rows.find((row) => row.id === departmentId)
-          if (match) { found = { ...match, school }; break }
+          try {
+            const rows = (await api.get(`/schools/${school.id}/departments`)).data || []
+            const match = rows.find((row) => row.id === departmentId)
+            if (match) {
+              found = { ...match, school }
+              break
+            }
+          } catch (departmentError) {
+            console.warn(`Could not load departments for school ${school.id}`, departmentError)
+          }
         }
+
+        if (!found) {
+          setDepartment(null)
+          setSemesters([])
+          setOpen({})
+          setError('Department not found or access is restricted.')
+          return
+        }
+
         const [semesterRes, subjectRes] = await Promise.all([
-          api.get('/semesters/', { params: { department_id: departmentId } }),
-          api.get('/subjects/', { params: { department_id: departmentId } })
+          api.get('/semesters/', { params: { department_id: departmentId } }).catch((semesterError) => {
+            if (semesterError?.response?.status === 404 || semesterError?.response?.status === 403) {
+              return { data: [] }
+            }
+            throw semesterError
+          }),
+          api.get('/subjects/', { params: { department_id: departmentId } }).catch((subjectError) => {
+            if (subjectError?.response?.status === 404 || subjectError?.response?.status === 403) {
+              return { data: [] }
+            }
+            throw subjectError
+          })
         ])
         const subjects = subjectRes.data || []
         const grouped = (semesterRes.data || []).sort((a, b) => a.semester_number - b.semester_number).map((semester) => ({ ...semester, subjects: subjects.filter((subject) => subject.semester_id === semester.id) }))
@@ -80,7 +114,10 @@ export default function DepartmentWorkspacePage(){
         if (found) setEditForm({ name: found.name || '', code: found.code || '', description: found.description || '', duration_years: found.duration_years || '', total_semesters: found.total_semesters || '' })
         setSemesters(grouped)
         setOpen(Object.fromEntries(grouped.map((semester) => [semester.id, true])))
-      } catch (err) { setError(err?.response?.data?.detail || 'Failed to load department workspace.') }
+      } catch (err) {
+        console.error('Failed to load department workspace.', err)
+        setError(err?.response?.data?.detail || 'Failed to load department workspace.')
+      }
     }
     load()
   }, [departmentId])

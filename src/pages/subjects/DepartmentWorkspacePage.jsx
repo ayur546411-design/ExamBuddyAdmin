@@ -197,30 +197,36 @@ export default function DepartmentWorkspacePage(){
       if (aiExtractorText.trim()) formData.append('text', aiExtractorText)
       const response = await api.post('/subjects/ai/extract-syllabus', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
       const nextSyllabus = normalizeSyllabusPayload(response.data.structured_json || { Units: [] })
+      if (!nextSyllabus.Units.length) {
+        throw new Error('AI did not find any syllabus units or topics in this content. Try a clearer PDF/image or paste the syllabus text.')
+      }
       setAiExtractedSyllabus(nextSyllabus)
-      setAiExtractorOpen(true)
-      setSuccess('AI extraction completed. Review the generated units and save when ready.')
+      await persistAiSyllabus(nextSyllabus)
     } catch (err) {
-      setError(err?.response?.data?.detail || 'AI extraction failed. Please try again.')
+      setError(err?.response?.data?.detail || err?.message || 'AI extraction failed. Please try again.')
     } finally { setAiExtractorLoading(false) }
   }
 
-  async function applyAiSyllabus(){
+  async function persistAiSyllabus(nextSyllabus){
     if (!subject?.id) return
     setEditorSaving(true); setError(''); setSuccess('')
     try {
       const documentId = syllabusDocument?.id || syllabusDocument?.document_id
-      const payload = { structured_json: aiExtractedSyllabus, status: syllabusStatus === 'draft' ? 'active' : syllabusStatus }
+      const payload = { structured_json: nextSyllabus, status: syllabusStatus === 'draft' ? 'active' : syllabusStatus }
       const response = documentId
         ? await api.put(`/documents/${documentId}`, payload)
         : await api.post('/documents/workspace-syllabus', { subject_id: subject.id, ...payload })
       setSyllabusDocument(response.data)
       setSyllabusStatus(payload.status)
       setAiExtractorOpen(false)
-      setSuccess('Extracted syllabus saved successfully and is now visible in the workspace.')
+      setSuccess('AI syllabus saved successfully. It is now visible in this subject workspace and the student app.')
     } catch (err) {
       setError(err?.response?.data?.detail || 'Failed to save the extracted syllabus.')
     } finally { setEditorSaving(false) }
+  }
+
+  async function applyAiSyllabus(){
+    await persistAiSyllabus(aiExtractedSyllabus)
   }
 
   async function handleAiBulkCreate(){

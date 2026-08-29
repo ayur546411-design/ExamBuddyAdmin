@@ -21,10 +21,44 @@ export default function DepartmentWorkspacePage(){
   const [editorSaving, setEditorSaving] = useState(false)
   const [copyOpen, setCopyOpen] = useState(false)
   const [copyDestinations, setCopyDestinations] = useState([])
-   const [addSubjectOpen, setAddSubjectOpen] = useState(false)
-   const [newSubject, setNewSubject] = useState({ name: '', code: '', description: '' })
+  const [addSubjectOpen, setAddSubjectOpen] = useState(false)
+  const [newSubject, setNewSubject] = useState({ name: '', code: '', description: '' })
   const [addSemesterOpen, setAddSemesterOpen] = useState(false)
   const [newSemesterNumber, setNewSemesterNumber] = useState('')
+  const [aiExtractorOpen, setAiExtractorOpen] = useState(false)
+  const [aiBulkOpen, setAiBulkOpen] = useState(false)
+  const [aiExtractorText, setAiExtractorText] = useState('')
+  const [aiExtractorFile, setAiExtractorFile] = useState(null)
+  const [aiExtractorLoading, setAiExtractorLoading] = useState(false)
+  const [aiExtractedSyllabus, setAiExtractedSyllabus] = useState({ Units: [] })
+  const [aiBulkText, setAiBulkText] = useState('')
+  const [aiBulkFile, setAiBulkFile] = useState(null)
+  const [aiBulkLoading, setAiBulkLoading] = useState(false)
+
+  function normalizeTopicEntry(topic, fallbackIndex = 1){
+    if (typeof topic === 'string') return { name: topic.trim() || `Topic ${fallbackIndex}`, subtopics: [] }
+    if (topic && typeof topic === 'object') {
+      const name = topic.name || topic['Topic Name'] || topic.title || topic['topic'] || `Topic ${fallbackIndex}`
+      const subtopics = Array.isArray(topic.subtopics)
+        ? topic.subtopics
+        : Array.isArray(topic['Subtopics'])
+          ? topic['Subtopics']
+          : []
+      return { name: String(name).trim() || `Topic ${fallbackIndex}`, subtopics: subtopics.map((item) => String(item).trim()).filter(Boolean) }
+    }
+    return { name: `Topic ${fallbackIndex}`, subtopics: [] }
+  }
+
+  function normalizeSyllabusPayload(payload){
+    const rawUnits = Array.isArray(payload?.Units) ? payload.Units : []
+    return {
+      ...(payload || {}),
+      Units: rawUnits.map((unit, index) => ({
+        'Unit Name': unit?.['Unit Name'] || unit?.unit_name || unit?.name || `Unit ${index + 1}`,
+        Topics: (Array.isArray(unit?.Topics) ? unit.Topics : Array.isArray(unit?.topics) ? unit.topics : []).map((topic, topicIndex) => normalizeTopicEntry(topic, topicIndex + 1)),
+      })),
+    }
+  }
 
   useEffect(() => {
     async function load(){
@@ -99,12 +133,75 @@ export default function DepartmentWorkspacePage(){
   }, [selectedSubjectId])
 
   function updateUnit(unitIndex, patch){ setSyllabusDocument((current) => ({ ...current, structured_json: { ...syllabus, Units: units.map((unit, index) => index === unitIndex ? { ...unit, ...patch } : unit) } })) }
-  function updateTopic(unitIndex, topicIndex, value){ updateUnit(unitIndex, { Topics: (units[unitIndex].Topics || units[unitIndex].topics || []).map((topic, index) => index === topicIndex ? value : topic) }) }
+  function updateTopic(unitIndex, topicIndex, value){
+    const nextTopics = (units[unitIndex].Topics || units[unitIndex].topics || []).map((topic, index) => {
+      if (index !== topicIndex) return topic
+      if (typeof topic === 'string') return value
+      if (topic && typeof topic === 'object') return { ...topic, name: value }
+      return { name: value, subtopics: [] }
+    })
+    updateUnit(unitIndex, { Topics: nextTopics })
+  }
   function addUnit(){ setSyllabusDocument((current) => ({ ...current, structured_json: { ...syllabus, Units: [...units, { 'Unit Name': `Unit ${units.length + 1}`, Topics: [] }] } })) }
-  function addTopic(unitIndex){ updateUnit(unitIndex, { Topics: [...(units[unitIndex].Topics || units[unitIndex].topics || []), 'New topic'] }) }
+  function addTopic(unitIndex){ updateUnit(unitIndex, { Topics: [...(units[unitIndex].Topics || units[unitIndex].topics || []), { name: 'New topic', subtopics: [] }] }) }
   function deleteUnit(unitIndex){ setSyllabusDocument((current) => ({ ...current, structured_json: { ...syllabus, Units: units.filter((_, index) => index !== unitIndex) } })) }
   function deleteTopic(unitIndex, topicIndex){ updateUnit(unitIndex, { Topics: (units[unitIndex].Topics || units[unitIndex].topics || []).filter((_, index) => index !== topicIndex) }) }
   function moveUnit(unitIndex, direction){ const target = unitIndex + direction; if (target < 0 || target >= units.length) return; const next = [...units]; [next[unitIndex], next[target]] = [next[target], next[unitIndex]]; setSyllabusDocument((current) => ({ ...current, structured_json: { ...syllabus, Units: next } })) }
+
+  async function handleAiSyllabusExtract(){
+    if (!aiExtractorText.trim() && !aiExtractorFile) {
+      setError('Paste syllabus text or upload a file before extracting.')
+      return
+    }
+    setAiExtractorLoading(true); setError(''); setSuccess('')
+    try {
+      const formData = new FormData()
+      if (aiExtractorFile) formData.append('file', aiExtractorFile)
+      if (aiExtractorText.trim()) formData.append('text', aiExtractorText)
+      const response = await api.post('/subjects/ai/extract-syllabus', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      const nextSyllabus = normalizeSyllabusPayload(response.data.structured_json || { Units: [] })
+      setAiExtractedSyllabus(nextSyllabus)
+      setAiExtractorOpen(true)
+      setSuccess('AI extraction completed. Review the generated units and save when ready.')
+    } catch (err) {
+      setError(err?.response?.data?.detail || 'AI extraction failed. Please try again.')
+    } finally { setAiExtractorLoading(false) }
+  }
+
+  async function applyAiSyllabus(){
+    if (!subject?.id) return
+    setSyllabusDocument((current) => ({ ...current, structured_json: aiExtractedSyllabus, status: syllabusStatus }))
+    setAiExtractorOpen(false)
+    setSuccess('Extracted syllabus loaded into the editor. Save changes to persist it.')
+  }
+
+  async function handleAiBulkCreate(){
+    if (!aiBulkText.trim() && !aiBulkFile) {
+      setError('Paste a subject list or upload a file before creating subjects.')
+      return
+    }
+    if (!selectedSemester) {
+      setError('Select a semester before creating subjects.')
+      return
+    }
+    setAiBulkLoading(true); setError(''); setSuccess('')
+    try {
+      const formData = new FormData()
+      formData.append('department_id', department.id)
+      formData.append('semester_id', selectedSemester.id)
+      if (aiBulkFile) formData.append('file', aiBulkFile)
+      if (aiBulkText.trim()) formData.append('text', aiBulkText)
+      const response = await api.post('/subjects/ai/bulk-create', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      const createdCount = response.data?.length || 0
+      setSemesters((current) => current.map((semester) => semester.id === selectedSemester.id ? { ...semester, subjects: [...semester.subjects, ...response.data] } : semester))
+      setAiBulkText(''); setAiBulkFile(null); setAiBulkOpen(false)
+      setSuccess(`Created ${createdCount} subject${createdCount === 1 ? '' : 's'} successfully.`)
+      if (response.data?.[0]?.id) setSelectedSubjectId(response.data[0].id)
+    } catch (err) {
+      setError(err?.response?.data?.detail || 'Bulk creation failed. Please review the input and try again.')
+    } finally { setAiBulkLoading(false) }
+  }
+
   async function saveEditor(){
     setEditorSaving(true); setError(''); setSuccess('')
     try {
@@ -246,6 +343,7 @@ export default function DepartmentWorkspacePage(){
         <div className="academic-card semester-navigation"><div className="panel-heading"><strong>Semesters</strong><span>{semesters.length}</span></div>{semesters.map((semester) => <div className="semester-nav-row" key={semester.id}><button className={`semester-nav-item ${selectedSemester?.id === semester.id ? 'active' : ''}`} type="button" onClick={() => setOpen(Object.fromEntries(semesters.map((item) => [item.id, item.id === semester.id])))}><span>Semester {semester.semester_number}</span><small>{semester.subjects.length} Subjects ›</small></button><button className="semester-delete-button" type="button" title={`Delete Semester ${semester.semester_number}`} onClick={() => deleteSemester(semester)}>×</button></div>)}</div>
         <button className="btn primary workspace-add-semester" type="button" onClick={() => { const semesterNumber = window.prompt('Enter semester number'); if (semesterNumber) addSemester(semesterNumber) }} disabled={!department}>+ Add Semester</button>
         <button className="btn workspace-add-semester" type="button" onClick={() => setAddSubjectOpen(true)} disabled={!selectedSemester}>+ Add Subject</button>
+        <button className="btn workspace-add-semester" type="button" onClick={() => setAiBulkOpen(true)} disabled={!selectedSemester}>AI Bulk Subject Creator</button>
         <button className="btn workspace-add-semester" type="button" onClick={(event) => { event.stopPropagation(); openCopy() }} disabled={!subject}>Copy Subject</button>
         <button className="btn workspace-add-semester" type="button" onClick={shiftSelectedSubject} disabled={!subject}>Shift Subject</button>
         <button className="btn danger workspace-add-semester" type="button" onClick={deleteSelectedSubject} disabled={!subject}>Delete Subject</button>
@@ -256,5 +354,7 @@ export default function DepartmentWorkspacePage(){
     </div>
     {copyOpen && <div className="modal-backdrop" onClick={() => setCopyOpen(false)}><div className="modal-card" onClick={(event) => event.stopPropagation()}><div className="modal-header"><h3>Copy {subject?.name}</h3><button className="text-button" type="button" onClick={() => setCopyOpen(false)}>Close</button></div><form className="modal-form" onSubmit={copySubject}><p className="modal-hint">Choose another department and semester.</p>{copyDestinations.map((destination, index) => <label className="copy-destination-row" key={destination.department.id}><span><input type="checkbox" checked={destination.selected} onChange={(event) => setCopyDestinations((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, selected: event.target.checked } : item))} /> {destination.department.name}</span><select value={destination.semesterId} disabled={!destination.selected} onChange={(event) => setCopyDestinations((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, semesterId: event.target.value } : item))}>{destination.semesters.map((semester) => <option key={semester.id} value={semester.id}>Semester {semester.semester_number}</option>)}</select></label>)}{!copyDestinations.length && <div className="empty-state">No other departments with semesters found.</div>}<div className="modal-actions"><button className="btn" type="button" onClick={() => setCopyOpen(false)}>Cancel</button><button className="btn primary" disabled={editorSaving || !copyDestinations.length}>Copy subject</button></div></form></div></div>}
     {addSubjectOpen && <div className="modal-backdrop" onClick={() => setAddSubjectOpen(false)}><div className="modal-card" onClick={(event) => event.stopPropagation()}><div className="modal-header"><h3>Add subject to Semester {selectedSemester?.semester_number}</h3><button className="text-button" type="button" onClick={() => setAddSubjectOpen(false)}>Close</button></div><form className="modal-form" onSubmit={addSubject}><label>Subject name<input value={newSubject.name} onChange={(event) => setNewSubject({ ...newSubject, name: event.target.value })} required /></label><label>Subject code<input value={newSubject.code} onChange={(event) => setNewSubject({ ...newSubject, code: event.target.value })} required /></label><label>Description<textarea rows="4" value={newSubject.description} onChange={(event) => setNewSubject({ ...newSubject, description: event.target.value })} /></label><div className="modal-actions"><button className="btn" type="button" onClick={() => setAddSubjectOpen(false)}>Cancel</button><button className="btn primary" disabled={editorSaving}>Create subject</button></div></form></div></div>}
+    {aiExtractorOpen && <div className="modal-backdrop" onClick={() => setAiExtractorOpen(false)}><div className="modal-card ai-modal-card" onClick={(event) => event.stopPropagation()}><div className="modal-header"><h3>AI Syllabus Extractor</h3><button className="text-button" type="button" onClick={() => setAiExtractorOpen(false)}>Close</button></div><div className="modal-form"><label className="file-input-label">Upload PDF or image<input type="file" accept=".pdf,image/*" onChange={(event) => setAiExtractorFile(event.target.files?.[0] || null)} /></label><label>Paste syllabus text<textarea rows="10" value={aiExtractorText} onChange={(event) => setAiExtractorText(event.target.value)} placeholder="Paste the full syllabus or unit list here..." /></label><div className="modal-actions"><button className="btn" type="button" onClick={() => { setAiExtractorText(''); setAiExtractorFile(null) }}>Clear</button><button className="btn primary" type="button" onClick={handleAiSyllabusExtract} disabled={aiExtractorLoading}>{aiExtractorLoading ? 'Extracting...' : 'Extract syllabus'}</button></div></div>{aiExtractedSyllabus?.Units?.length > 0 && <div className="ai-review-panel"><h4>Review extracted content</h4>{aiExtractedSyllabus.Units.map((unit, unitIndex) => <div className="ai-unit-card" key={`ai-unit-${unitIndex}`}><div className="ai-unit-header"><strong>Unit {unitIndex + 1}</strong><input value={unit['Unit Name'] || ''} onChange={(event) => setAiExtractedSyllabus((current) => ({ ...current, Units: current.Units.map((entry, idx) => idx === unitIndex ? { ...entry, 'Unit Name': event.target.value } : entry) }))} /></div>{(unit.Topics || []).map((topic, topicIndex) => <div className="ai-topic-row" key={`ai-topic-${unitIndex}-${topicIndex}`}><input value={typeof topic === 'string' ? topic : topic?.name || ''} onChange={(event) => setAiExtractedSyllabus((current) => ({ ...current, Units: current.Units.map((entry, idx) => idx === unitIndex ? { ...entry, Topics: (entry.Topics || []).map((item, itemIndex) => itemIndex === topicIndex ? { ...(typeof item === 'object' ? item : { name: item, subtopics: [] }), name: event.target.value } : item) } : entry) }))} /><button className="text-button danger" type="button" onClick={() => setAiExtractedSyllabus((current) => ({ ...current, Units: current.Units.map((entry, idx) => idx === unitIndex ? { ...entry, Topics: (entry.Topics || []).filter((item, itemIndex) => itemIndex !== topicIndex) } : entry) }))}>Remove</button></div>)}<button className="btn" type="button" onClick={() => setAiExtractedSyllabus((current) => ({ ...current, Units: current.Units.map((entry, idx) => idx === unitIndex ? { ...entry, Topics: [...(entry.Topics || []), { name: 'New topic', subtopics: [] }] } : entry) }))}>+ Add topic</button></div>)}<div className="modal-actions"><button className="btn" type="button" onClick={() => setAiExtractedSyllabus({ Units: [] })}>Reset</button><button className="btn primary" type="button" onClick={applyAiSyllabus}>Apply to subject</button></div></div>}</div></div>}
+    {aiBulkOpen && <div className="modal-backdrop" onClick={() => setAiBulkOpen(false)}><div className="modal-card ai-modal-card" onClick={(event) => event.stopPropagation()}><div className="modal-header"><h3>AI Bulk Subject Creator</h3><button className="text-button" type="button" onClick={() => setAiBulkOpen(false)}>Close</button></div><div className="modal-form"><label className="file-input-label">Upload PDF or text file<input type="file" accept=".pdf,.txt,.csv,.doc,.docx,image/*" onChange={(event) => setAiBulkFile(event.target.files?.[0] || null)} /></label><label>Paste subject list<textarea rows="10" value={aiBulkText} onChange={(event) => setAiBulkText(event.target.value)} placeholder="Paste rows like: Subject Name, Subject Code, Credits" /></label><div className="modal-actions"><button className="btn" type="button" onClick={() => { setAiBulkText(''); setAiBulkFile(null) }}>Clear</button><button className="btn primary" type="button" onClick={handleAiBulkCreate} disabled={aiBulkLoading}>{aiBulkLoading ? 'Creating...' : 'Create subjects'}</button></div></div></div></div>}
   </div>
 }

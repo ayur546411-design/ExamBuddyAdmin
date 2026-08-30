@@ -29,16 +29,18 @@ export default function SubjectsPage(){
       const schoolsRes = await api.get('/schools/')
       const schools = schoolsRes.data || []
 
-      const deptRows = []
-      for (const school of schools) {
-        const departmentsRes = await api.get(`/schools/${school.id}/departments/`)
-        const departmentsForSchool = departmentsRes.data || []
-        deptRows.push(...departmentsForSchool.map((dept) => ({ ...dept, schoolName: school.name, school_id: dept.school_id || school.id, semesters: [] })))
-      }
+      const deptRows = await Promise.all(
+        schools.map(async (school) => {
+          const departmentsRes = await api.get(`/schools/${school.id}/departments/`)
+          const departmentsForSchool = departmentsRes.data || []
+          return departmentsForSchool.map((dept) => ({ ...dept, schoolName: school.name, school_id: dept.school_id || school.id, semesters: [] }))
+        })
+      )
 
-      setDepartments(deptRows)
-      if (deptRows.length) {
-        const firstDept = deptRows[0]
+      const flattenedRows = deptRows.flat()
+      setDepartments(flattenedRows)
+      if (flattenedRows.length) {
+        const firstDept = flattenedRows[0]
         setSelectedDepartmentId((current) => current || firstDept.id)
         setSemesterForm((prev) => ({ ...prev, department_id: firstDept.id }))
       } else {

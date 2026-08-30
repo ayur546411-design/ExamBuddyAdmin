@@ -53,12 +53,16 @@ export default function DocumentsPage(){
       try{
         const schoolsRes = await api.get('/schools/')
         const schools = schoolsRes.data || []
-        const deptRows = []
-        for(const school of schools){
-          const departmentsRes = await api.get(`/schools/${school.id}/departments/`)
-          const departmentsForSchool = departmentsRes.data || []
-          deptRows.push(...departmentsForSchool.map((d)=>({ ...d, schoolName: school.name, school_id: d.school_id || school.id })))
-        }
+
+        const schoolDepartments = await Promise.all(
+          schools.map(async (school) => {
+            const departmentsRes = await api.get(`/schools/${school.id}/departments/`)
+            const departmentsForSchool = departmentsRes.data || []
+            return departmentsForSchool.map((d) => ({ ...d, schoolName: school.name, school_id: d.school_id || school.id }))
+          })
+        )
+
+        const deptRows = schoolDepartments.flat()
         setDepartments(deptRows)
         if(deptRows.length){
           setSelectedDepartmentId((cur) => cur || deptRows[0].id)

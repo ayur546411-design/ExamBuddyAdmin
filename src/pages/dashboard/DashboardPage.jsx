@@ -10,7 +10,7 @@ export default function DashboardPage(){
   useEffect(()=>{
     async function load(){
       try{
-        const res = await api.get('/documents')
+        const res = await api.get('/documents', { params: { page_size: 0 } })
         const docs = res.data || []
         const total = docs.length
         const published = docs.filter(d=>d.status==='published').length

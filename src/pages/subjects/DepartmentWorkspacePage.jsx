@@ -71,20 +71,21 @@ export default function DepartmentWorkspacePage(){
 
       try {
         const schools = (await api.get('/schools/')).data || []
-        let found = null
 
-        for (const school of schools) {
-          try {
-            const rows = (await api.get(`/schools/${school.id}/departments`)).data || []
-            const match = rows.find((row) => row.id === departmentId)
-            if (match) {
-              found = { ...match, school }
-              break
+        const departmentMatches = await Promise.all(
+          schools.map(async (school) => {
+            try {
+              const rows = (await api.get(`/schools/${school.id}/departments`)).data || []
+              const match = rows.find((row) => row.id === departmentId)
+              return match ? { ...match, school } : null
+            } catch (departmentError) {
+              console.warn(`Could not load departments for school ${school.id}`, departmentError)
+              return null
             }
-          } catch (departmentError) {
-            console.warn(`Could not load departments for school ${school.id}`, departmentError)
-          }
-        }
+          })
+        )
+
+        const found = departmentMatches.find(Boolean) || null
 
         if (!found) {
           setDepartment(null)

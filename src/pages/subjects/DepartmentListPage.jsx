@@ -11,18 +11,32 @@ export default function DepartmentListPage(){
     async function load(){
       try {
         const schools = (await api.get('/schools/')).data || []
-        const rows = []
-        for (const school of schools) {
-          const departments = (await api.get(`/schools/${school.id}/departments`)).data || []
-          for (const department of departments) {
-            const [semesters, subjects] = await Promise.all([
-              api.get('/semesters/', { params: { department_id: department.id } }),
-              api.get('/subjects/', { params: { department_id: department.id } })
-            ])
-            rows.push({ ...department, school, semesters: semesters.data || [], subjects: subjects.data || [] })
-          }
-        }
-        setDepartments(rows)
+
+        const schoolDepartments = await Promise.all(
+          schools.map(async (school) => {
+            const departments = (await api.get(`/schools/${school.id}/departments`)).data || []
+
+            const departmentDetails = await Promise.all(
+              departments.map(async (department) => {
+                const [semesters, subjects] = await Promise.all([
+                  api.get('/semesters/', { params: { department_id: department.id } }),
+                  api.get('/subjects/', { params: { department_id: department.id } })
+                ])
+
+                return {
+                  ...department,
+                  school,
+                  semesters: semesters.data || [],
+                  subjects: subjects.data || []
+                }
+              })
+            )
+
+            return departmentDetails
+          })
+        )
+
+        setDepartments(schoolDepartments.flat())
       } catch (err) {
         setError(err?.response?.data?.detail || 'Failed to load departments.')
       } finally { setLoading(false) }

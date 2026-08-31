@@ -16,6 +16,7 @@ import SubjectEditorPage from './pages/subjects/SubjectEditorPage'
 import SubjectDetailPage from './pages/subjects/SubjectDetailPage'
 import PyqsPage from './pages/documents/PyqsPage'
 import UsersPage from './pages/users/UsersPage'
+import FeedbackPage from './pages/feedback/FeedbackPage'
 import SettingsPage from './pages/settings/SettingsPage'
 import MainLayout from './layouts/MainLayout'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -55,6 +56,7 @@ export default function App(){
           <Route path="/subjects/legacy" element={<SubjectsPage />} />
           <Route path="/pyqs" element={<PyqsPage />} />
           <Route path="/users" element={<UsersPage />} />
+          <Route path="/feedback" element={<FeedbackPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />

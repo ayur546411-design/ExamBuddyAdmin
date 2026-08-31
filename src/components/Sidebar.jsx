@@ -12,6 +12,7 @@ const links = [
   { to: '/subjects/departments/new', label: 'Name Department' },
   { to: '/pyqs', label: 'PYQ Manager' },
   { to: '/users', label: 'Users' },
+  { to: '/feedback', label: 'Feedback' },
   { to: '/settings', label: 'Settings' }
 ]
 

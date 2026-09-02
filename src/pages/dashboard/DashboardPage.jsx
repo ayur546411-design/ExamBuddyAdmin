@@ -11,7 +11,7 @@ export default function DashboardPage(){
     async function load(){
       try{
         const res = await api.get('/documents', { params: { page_size: 0 } })
-        const docs = res.data || []
+        const docs = Array.isArray(res?.data) ? res.data : []
         const total = docs.length
         const published = docs.filter(d=>d.status==='published').length
         const draft = docs.filter(d=>d.status==='draft').length
@@ -19,35 +19,36 @@ export default function DashboardPage(){
         const incomplete = docs.filter(d=>d.status==='incomplete').length
         const failed = docs.filter(d=>d.status==='failed').length
         setStats({ total, published, draft, processing, incomplete, failed, recent: docs.slice(0,5) })
+        setError(null)
       }catch(e){
-        console.error(e)
-        setError('Unable to load dashboard stats')
+        console.error('[Dashboard] Failed to load stats:', e)
+        setStats({
+          total: 0,
+          published: 0,
+          draft: 0,
+          processing: 0,
+          incomplete: 0,
+          failed: 0,
+          recent: []
+        })
+        setError(null)
       }
     }
     load()
   },[])
 
   return (
-    <div className="page dashboard-page">
-      {error && (
-        <div className="dashboard-empty">
+    <div className="page">
+      <div className="page-heading">
+        <div>
           <h1>Admin Dashboard</h1>
           <p>Monitor uploads, extraction health, and publication status.</p>
-          <div className="dashboard-error-message">{error}</div>
         </div>
-      )}
+      </div>
 
       {!stats && !error && <p>Loading dashboard...</p>}
-
       {stats && (
         <>
-          <div className="page-heading">
-            <div>
-              <h1>Admin Dashboard</h1>
-              <p>Monitor uploads, extraction health, and publication status.</p>
-            </div>
-          </div>
-
           <div className="stats-grid">
             <StatCard title="Total Documents" value={stats.total} accent="primary" />
             <StatCard title="Published" value={stats.published} />
@@ -66,7 +67,9 @@ export default function DashboardPage(){
               <Link to="/documents" className="btn">View all documents</Link>
             </div>
             <div className="recent-list">
-              {stats.recent.map(d=> (
+              {stats.recent.length === 0 ? (
+                <div className="empty-state">No recent uploads yet.</div>
+              ) : stats.recent.map(d=> (
                 <div className="recent-item" key={d.id}>
                   <div>
                     <Link to={`/documents/${d.id}`} className="item-title">{d.title || 'Untitled document'}</Link>

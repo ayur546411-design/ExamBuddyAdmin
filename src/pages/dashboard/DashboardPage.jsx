@@ -28,18 +28,26 @@ export default function DashboardPage(){
   },[])
 
   return (
-    <div className="page">
-      <div className="page-heading">
-        <div>
+    <div className="page dashboard-page">
+      {error && (
+        <div className="dashboard-empty">
           <h1>Admin Dashboard</h1>
           <p>Monitor uploads, extraction health, and publication status.</p>
+          <div className="dashboard-error-message">{error}</div>
         </div>
-      </div>
+      )}
 
       {!stats && !error && <p>Loading dashboard...</p>}
-      {error && <div className="error">{error}</div>}
+
       {stats && (
         <>
+          <div className="page-heading">
+            <div>
+              <h1>Admin Dashboard</h1>
+              <p>Monitor uploads, extraction health, and publication status.</p>
+            </div>
+          </div>
+
           <div className="stats-grid">
             <StatCard title="Total Documents" value={stats.total} accent="primary" />
             <StatCard title="Published" value={stats.published} />

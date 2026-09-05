@@ -10,15 +10,8 @@ export default function DashboardPage(){
   useEffect(()=>{
     async function load(){
       try{
-        const res = await api.get('/documents', { params: { page_size: 0 } })
-        const docs = Array.isArray(res?.data) ? res.data : []
-        const total = docs.length
-        const published = docs.filter(d=>d.status==='published').length
-        const draft = docs.filter(d=>d.status==='draft').length
-        const processing = docs.filter(d=>d.status==='processing').length
-        const incomplete = docs.filter(d=>d.status==='incomplete').length
-        const failed = docs.filter(d=>d.status==='failed').length
-        setStats({ total, published, draft, processing, incomplete, failed, recent: docs.slice(0,5) })
+        const res = await api.get('/documents/stats')
+        setStats(res?.data || {})
         setError(null)
       }catch(e){
         console.error('[Dashboard] Failed to load stats:', e)

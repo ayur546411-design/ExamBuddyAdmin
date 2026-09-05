@@ -13,6 +13,7 @@ export default function DepartmentWorkspacePage(){
   const [saving, setSaving] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', code: '', description: '', duration_years: '', total_semesters: '' })
   const [selectedSubjectId, setSelectedSubjectId] = useState('')
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState([])
   const [subject, setSubject] = useState(null)
   const [syllabusDocument, setSyllabusDocument] = useState(null)
   const [editorTab, setEditorTab] = useState('Syllabus / Units')
@@ -276,7 +277,9 @@ export default function DepartmentWorkspacePage(){
     } finally { setEditorSaving(false) }
   }
   async function openCopy(){
-    if (!subject) return
+    const sourceIds = selectedSubjectIds.length ? selectedSubjectIds : subject?.id ? [subject.id] : []
+    if (!sourceIds.length) return
+    setSelectedSubjectIds(sourceIds)
     setCopyOpen(true)
     setError('')
     try {
@@ -295,10 +298,17 @@ export default function DepartmentWorkspacePage(){
   }
   async function copySubject(event){
     event.preventDefault()
+    const sourceIds = selectedSubjectIds.length ? selectedSubjectIds : subject?.id ? [subject.id] : []
     const destinations = copyDestinations.filter((item) => item.selected).map((item) => ({ department_id: item.department.id, semester_id: item.semesterId }))
+    if (!sourceIds.length) { setError('Select at least one subject to copy.'); return }
     if (!destinations.length) { setError('Select a destination department and semester.'); return }
     setEditorSaving(true); setError('')
-    try { await api.post('/subjects/bulk-copy', { source_subject_ids: [subject.id], destinations }); setCopyOpen(false); setSuccess('Subject copied successfully.') }
+    try {
+      const response = await api.post('/subjects/bulk-copy', { source_subject_ids: sourceIds, destinations })
+      setCopyOpen(false)
+      const copiedCount = response.data?.length || sourceIds.length
+      setSuccess(`${copiedCount} subject${copiedCount === 1 ? '' : 's'} copied successfully.`)
+    }
     catch (err) { setError(err?.response?.data?.detail || 'Failed to copy subject.') }
     finally { setEditorSaving(false) }
   }
@@ -389,6 +399,26 @@ export default function DepartmentWorkspacePage(){
     {success && <div className="success">{success}</div>}
     {editing && <form className="card department-edit-form" onSubmit={saveDepartment}><div className="form-grid"><label>Department name<input value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} required /></label><label>Department code<input value={editForm.code} onChange={(event) => setEditForm({ ...editForm, code: event.target.value.toUpperCase() })} required /></label><label>Duration (years)<input type="number" min="1" value={editForm.duration_years} onChange={(event) => setEditForm({ ...editForm, duration_years: event.target.value })} /></label><label>Total semesters<input type="number" min="1" value={editForm.total_semesters} onChange={(event) => setEditForm({ ...editForm, total_semesters: event.target.value })} /></label></div><label className="full-width-field">Description<textarea rows="4" value={editForm.description} onChange={(event) => setEditForm({ ...editForm, description: event.target.value })} /></label><div className="modal-actions"><button className="btn" type="button" onClick={() => setEditing(false)}>Cancel</button><button className="btn primary" disabled={saving}>{saving ? 'Saving...' : 'Save department'}</button></div></form>}
     <div className="academic-shell">
+      <section className="academic-card copy-selection-panel">
+        <div className="panel-heading"><strong>Copy subjects to another department</strong><span>{selectedSubjectIds.length} selected</span></div>
+        <div className="copy-selection-grid">
+          {allSubjects.map((item) => (
+            <label key={item.id}>
+              <input
+                type="checkbox"
+                checked={selectedSubjectIds.includes(item.id)}
+                onChange={(event) => setSelectedSubjectIds((current) => event.target.checked
+                  ? [...new Set([...current, item.id])]
+                  : current.filter((id) => id !== item.id))}
+              />
+              {item.name}
+            </label>
+          ))}
+        </div>
+        <button className="btn primary" type="button" onClick={openCopy} disabled={!selectedSubjectIds.length}>
+          Copy selected subjects
+        </button>
+      </section>
       <aside className="academic-sidebar">
         <div className="academic-card department-summary"><div className="department-mark">{departmentName.charAt(0)}</div><div><strong>Department of {departmentName}</strong><small>{department?.code || 'Department code'}</small></div><div className="summary-stats"><span><b>{semesters.length}</b> Semesters</span><span><b>{subjectCount}</b> Subjects</span></div></div>
         <div className="academic-card semester-navigation"><div className="panel-heading"><strong>Semesters</strong><span>{semesters.length}</span></div>{semesters.map((semester) => <div className="semester-nav-row" key={semester.id}><button className={`semester-nav-item ${selectedSemester?.id === semester.id ? 'active' : ''}`} type="button" onClick={() => setOpen(Object.fromEntries(semesters.map((item) => [item.id, item.id === semester.id])))}><span>Semester {semester.semester_number}</span><small>{semester.subjects.length} Subjects ›</small></button><button className="semester-delete-button" type="button" title={`Delete Semester ${semester.semester_number}`} onClick={() => deleteSemester(semester)}>×</button></div>)}</div>
@@ -396,7 +426,7 @@ export default function DepartmentWorkspacePage(){
         <button className="btn workspace-add-semester" type="button" onClick={() => setAddSubjectOpen(true)} disabled={!selectedSemester}>+ Add Subject</button>
         <button className="btn workspace-add-semester" type="button" onClick={() => setAiExtractorOpen(true)} disabled={!selectedSemester}>AI Syllabus Extractor</button>
         <button className="btn workspace-add-semester" type="button" onClick={() => setAiBulkOpen(true)} disabled={!selectedSemester}>AI Bulk Subject Creator</button>
-        <button className="btn workspace-add-semester" type="button" onClick={(event) => { event.stopPropagation(); openCopy() }} disabled={!subject}>Copy Subject</button>
+        <button className="btn workspace-add-semester" type="button" onClick={(event) => { event.stopPropagation(); openCopy() }} disabled={!selectedSubjectIds.length && !subject}>Copy Selected Subjects</button>
         <button className="btn workspace-add-semester" type="button" onClick={shiftSelectedSubject} disabled={!subject}>Shift Subject</button>
         <button className="btn danger workspace-add-semester" type="button" onClick={deleteSelectedSubject} disabled={!subject}>Delete Subject</button>
         <label className="workspace-status-field">Syllabus status<select value={syllabusStatus} onChange={(event) => setSyllabusStatus(event.target.value)} disabled={!syllabusDocument}><option value="draft">Draft</option><option value="active">Active (visible in app)</option><option value="published">Published</option><option value="incomplete">Incomplete</option></select></label>

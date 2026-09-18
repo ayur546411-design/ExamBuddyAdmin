@@ -5,7 +5,8 @@ import api from '../../api/client'
 
 const documentTypes = [
   { value: 'syllabus', label: 'Syllabus' },
-  { value: 'pyq', label: 'PYQ / Question Paper' },
+  { value: 'pyq', label: 'PYQ / Question Paper (Subject)' },
+  { value: 'all_pyq', label: 'ALL PYQ (Combined Paper Bundle)' },
   { value: 'academic_calendar', label: 'Academic Calendar' },
   { value: 'note', label: 'Notes' },
   { value: 'other', label: 'Other' }
@@ -161,12 +162,14 @@ export default function UploadPage(){
     const hasYoutubeUrl = Boolean((form.youtube_url || '').trim())
     const hasDirectPdfUrl = Boolean((form.pdf_url || '').trim())
 
-    if(form.document_type !== 'pyq' && !file){
+    const isPyqOrAllPyq = form.document_type === 'pyq' || form.document_type === 'all_pyq'
+
+    if(!isPyqOrAllPyq && !file){
       setError('Select a PDF or image file')
       return
     }
 
-    if(form.document_type === 'pyq' && !file && !hasDirectPdfUrl && !hasYoutubeUrl){
+    if(isPyqOrAllPyq && !file && !hasDirectPdfUrl && !hasYoutubeUrl){
       setError('Select a PYQ PDF/image file, provide a direct PDF URL, or add a YouTube video URL')
       return
     }
@@ -174,17 +177,23 @@ export default function UploadPage(){
     if(!form.school_id || !form.department_id){ setError('Please select school and department'); return }
     if(form.document_type === 'syllabus' && !form.subject_id){ setError('Select the subject this syllabus belongs to'); return }
 
+    if(form.document_type === 'all_pyq' && !form.exam_type){
+      setError('Please select Exam Type (CT1, CT2, or End Semester) for ALL PYQ paper')
+      return
+    }
+
     const fd = new FormData()
     if(file){ fd.append('file', file) }
     fd.append('school_id', form.school_id)
     fd.append('department_id', form.department_id)
     fd.append('semester_id', form.semester_id)
-    fd.append('subject_id', form.subject_id)
-    fd.append('document_type', form.document_type)
+    fd.append('subject_id', form.subject_id || (form.document_type === 'all_pyq' ? 'all_pyq' : ''))
+    fd.append('document_type', form.document_type === 'all_pyq' ? 'pyq' : form.document_type)
     fd.append('academic_year', form.academic_year)
-    fd.append('title', form.title)
+    fd.append('title', form.title || (form.document_type === 'all_pyq' ? `ALL PYQ (${(form.exam_type || 'Paper').toUpperCase()})` : ''))
     fd.append('description', form.description)
     fd.append('exam_type', form.exam_type)
+    fd.append('keywords', form.document_type === 'all_pyq' ? 'all_pyq' : '')
     fd.append('pdf_url', form.pdf_url)
     fd.append('youtube_url', form.youtube_url)
     fd.append('video_title', form.video_title)

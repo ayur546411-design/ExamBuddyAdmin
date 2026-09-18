@@ -112,7 +112,7 @@ export default function PyqsPage(){
     loadSubjects()
   }, [filters.semester_id])
 
-  // 5. Fetch PYQ documents for selected subject
+  // 5. Fetch PYQ documents for selected subject or ALL PYQ bundle
   async function loadPyqs(){
     if (!filters.subject_id) {
       setPyqs([])
@@ -121,13 +121,19 @@ export default function PyqsPage(){
     setLoading(true)
     setError('')
     try {
-      const res = await api.get('/documents', {
-        params: {
-          subject_id: filters.subject_id,
-          document_type: 'pyq',
-          page_size: 0
-        }
-      })
+      const queryParams = {
+        document_type: 'pyq',
+        page_size: 0
+      }
+
+      if (filters.subject_id === 'all_pyq') {
+        queryParams.keywords = 'all_pyq'
+        if (filters.semester_id) queryParams.semester_id = filters.semester_id
+      } else {
+        queryParams.subject_id = filters.subject_id
+      }
+
+      const res = await api.get('/documents', { params: queryParams })
       setPyqs(res.data || [])
     } catch (err) {
       console.error(err)
@@ -168,14 +174,16 @@ export default function PyqsPage(){
     setUploadProgress(0)
 
     try {
+      const isAllPyq = filters.subject_id === 'all_pyq'
       const fd = new FormData()
       if (addFile) fd.append('file', addFile)
       fd.append('school_id', filters.school_id)
       fd.append('department_id', filters.department_id)
       fd.append('semester_id', filters.semester_id)
-      fd.append('subject_id', filters.subject_id)
+      fd.append('subject_id', isAllPyq ? 'all_pyq' : filters.subject_id)
       fd.append('document_type', 'pyq')
-      fd.append('title', addForm.title || `${subjects.find(s=>s.id === filters.subject_id)?.name || 'Subject'} PYQ`)
+      if (isAllPyq) fd.append('keywords', 'all_pyq')
+      fd.append('title', addForm.title || (isAllPyq ? `ALL PYQ (${addForm.exam_type.toUpperCase()})` : `${subjects.find(s=>s.id === filters.subject_id)?.name || 'Subject'} PYQ`))
       fd.append('description', addForm.description)
       fd.append('academic_year', addForm.academic_year)
       fd.append('exam_type', addForm.exam_type)
@@ -203,7 +211,9 @@ export default function PyqsPage(){
     }
   }
 
-  const activeSubjectName = subjects.find(s => s.id === filters.subject_id)?.name || 'Selected Subject'
+  const activeSubjectName = filters.subject_id === 'all_pyq' 
+    ? 'ALL PYQ (Combined Semester Bundle)'
+    : (subjects.find(s => s.id === filters.subject_id)?.name || 'Selected Subject')
 
   return (
     <div className="page">
@@ -247,6 +257,7 @@ export default function PyqsPage(){
           <label>Subject</label>
           <select value={filters.subject_id} onChange={e => setFilters(prev => ({ ...prev, subject_id: e.target.value }))} disabled={!filters.semester_id}>
             <option value="">Select subject</option>
+            <option value="all_pyq">📚 ALL PYQ (Combined Semester Bundle)</option>
             {subjects.map(sub => <option key={sub.id} value={sub.id}>{sub.name || sub.code}</option>)}
           </select>
         </div>

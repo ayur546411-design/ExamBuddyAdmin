@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../../api/client'
-import { deleteDocument, uploadDocument } from '../../api/documentsApi'
+import { deleteDocument, uploadDocument, updateDocument, publishDocument } from '../../api/documentsApi'
 
 export default function PyqsPage(){
   const [schools, setSchools] = useState([])
@@ -182,7 +182,6 @@ export default function PyqsPage(){
       fd.append('semester_id', filters.semester_id)
       fd.append('subject_id', isAllPyq ? 'all_pyq' : filters.subject_id)
       fd.append('document_type', 'pyq')
-      if (isAllPyq) fd.append('keywords', 'all_pyq')
       fd.append('title', addForm.title || (isAllPyq ? `ALL PYQ (${addForm.exam_type.toUpperCase()})` : `${subjects.find(s=>s.id === filters.subject_id)?.name || 'Subject'} PYQ`))
       fd.append('description', addForm.description)
       fd.append('academic_year', addForm.academic_year)
@@ -191,13 +190,29 @@ export default function PyqsPage(){
       fd.append('video_title', addForm.video_title)
       fd.append('pdf_url', addForm.pdf_url)
       fd.append('keywords', addForm.keyword)
-      fd.append('status', addForm.status)
 
-      await uploadDocument(fd, (evt) => {
+      const uploadRes = await uploadDocument(fd, (evt) => {
         if (evt.total) {
           setUploadProgress(Math.round((evt.loaded / evt.total) * 100))
         }
       })
+
+      // Apply keyword + status via PATCH since the upload endpoint ignores them
+      const docId = uploadRes?.data?.id || uploadRes?.data?.document_id
+      if (docId) {
+        try {
+          await updateDocument(docId, {
+            keywords: addForm.keyword,
+            status: addForm.status,
+          })
+          // If admin selected Published, trigger the publish flow
+          if (addForm.status === 'published') {
+            await publishDocument(docId, { force_publish_incomplete: true }).catch(() => {})
+          }
+        } catch (patchErr) {
+          console.warn('[PyqsPage] Could not patch keyword/status after upload:', patchErr)
+        }
+      }
 
       setSuccess('PYQ document uploaded and processed successfully.')
       setAddOpen(false)

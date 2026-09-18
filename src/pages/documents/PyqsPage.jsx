@@ -23,7 +23,7 @@ export default function PyqsPage(){
 
   // Add PYQ modal states
   const [addOpen, setAddOpen] = useState(false)
-  const [addForm, setAddForm] = useState({ title: '', description: '', academic_year: '', exam_type: 'end_semester', youtube_url: '', video_title: '', pdf_url: '' })
+  const [addForm, setAddForm] = useState({ title: '', description: '', academic_year: '', exam_type: 'end_semester', youtube_url: '', video_title: '', pdf_url: '', keyword: 'all_pyq', status: 'published' })
   const [addFile, setAddFile] = useState(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [saving, setSaving] = useState(false)
@@ -190,6 +190,8 @@ export default function PyqsPage(){
       fd.append('youtube_url', addForm.youtube_url)
       fd.append('video_title', addForm.video_title)
       fd.append('pdf_url', addForm.pdf_url)
+      fd.append('keywords', addForm.keyword)
+      fd.append('status', addForm.status)
 
       await uploadDocument(fd, (evt) => {
         if (evt.total) {
@@ -200,7 +202,7 @@ export default function PyqsPage(){
       setSuccess('PYQ document uploaded and processed successfully.')
       setAddOpen(false)
       setAddFile(null)
-      setAddForm({ title: '', description: '', academic_year: '', exam_type: 'end_semester', youtube_url: '', video_title: '', pdf_url: '' })
+      setAddForm({ title: '', description: '', academic_year: '', exam_type: 'end_semester', youtube_url: '', video_title: '', pdf_url: '', keyword: 'all_pyq', status: 'published' })
       await loadPyqs()
     } catch (err) {
       console.error(err)
@@ -365,6 +367,77 @@ export default function PyqsPage(){
                 Select PDF / Image File
                 <input type="file" accept=".pdf,image/png,image/jpeg,image/jpg,image/webp" onChange={e => setAddFile(e.target.files?.[0] || null)} />
               </label>
+
+              {/* Keyword Tag */}
+              <div style={{ marginTop: 16 }}>
+                <label style={{ fontWeight: '600', fontSize: '0.82rem', color: '#374151', display: 'block', marginBottom: 6 }}>
+                  Keyword Tag <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {[
+                    { id: 'all_pyq',     label: '📚 all_pyq',     desc: 'Combined Semester Bundle — shown in ALL PYQ section', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+                    { id: 'subject_pyq', label: '📄 subject_pyq', desc: 'Single Subject Paper',                               color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+                    { id: 'ct_bundle',   label: '🗂️ ct_bundle',   desc: 'Class Test Bundle (multi-subject)',                  color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+                  ].map(kw => {
+                    const active = addForm.keyword === kw.id
+                    return (
+                      <button
+                        key={kw.id}
+                        type="button"
+                        onClick={() => setAddForm(prev => ({ ...prev, keyword: kw.id }))}
+                        style={{
+                          padding: '7px 14px', borderRadius: 20, cursor: 'pointer', fontWeight: '700', fontSize: '0.8rem',
+                          border: `1.5px solid ${active ? kw.color : '#E5E7EB'}`,
+                          backgroundColor: active ? kw.bg : '#F9FAFB',
+                          color: active ? kw.color : '#6B7280',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {kw.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <p style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: 6, fontStyle: 'italic' }}>
+                  📌 {{
+                    all_pyq: 'Combined Semester Bundle — shown in ALL PYQ section of the app',
+                    subject_pyq: 'Single Subject Paper — shown under that specific subject',
+                    ct_bundle: 'Class Test Bundle covering multiple subjects',
+                  }[addForm.keyword]}
+                </p>
+              </div>
+
+              {/* Status */}
+              <div style={{ marginTop: 16 }}>
+                <label style={{ fontWeight: '600', fontSize: '0.82rem', color: '#374151', display: 'block', marginBottom: 6 }}>
+                  Status <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {[
+                    { id: 'published', label: '✅ Published', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+                    { id: 'draft',     label: '📝 Draft',     color: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB' },
+                  ].map(st => {
+                    const active = addForm.status === st.id
+                    return (
+                      <button
+                        key={st.id}
+                        type="button"
+                        onClick={() => setAddForm(prev => ({ ...prev, status: st.id }))}
+                        style={{
+                          flex: 1, padding: '10px 0', borderRadius: 12, cursor: 'pointer',
+                          fontWeight: '800', fontSize: '0.85rem',
+                          border: `1.5px solid ${active ? st.color : '#E5E7EB'}`,
+                          backgroundColor: active ? st.bg : '#fff',
+                          color: active ? st.color : '#9CA3AF',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {st.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
 
               {uploadProgress > 0 && (
                 <div style={{ marginTop: 12 }}>
